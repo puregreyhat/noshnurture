@@ -37,7 +37,7 @@ export function parseMeasure(str: string | undefined | null): { value: number; u
   // common patterns: "500 g", "500g", "1 kg", "500 ml", "1 l"
   const m = s.match(/([0-9,.]+)\s*(kg|g|grams?|ml|l|litre|liter|ltr|gms?)/i);
   if (!m) return null;
-  let raw = m[1].replace(',', '.');
+  const raw = m[1].replace(',', '.');
   const value = Number(raw);
   let unit = (m[2] || '').toLowerCase();
   if (unit === 'grams' || unit === 'gram' || unit === 'gms' || unit === 'g') unit = 'g';
@@ -95,7 +95,7 @@ export function enhanceProductData(p: QRProduct) : InventoryItem {
     const perUnit = p.measure.value;
     const measureUnit = p.measure.unit;
     // total amount in base units
-    let total = perUnit * (p.quantity || 1);
+  const total = perUnit * (p.quantity || 1);
 
     // normalize grams -> kg if >= 1000
     if (measureUnit === 'g') {

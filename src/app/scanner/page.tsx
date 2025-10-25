@@ -621,7 +621,7 @@ export default function ScannerPage() {
                               <div className="flex-1">
                                 <h4 className="font-bold text-lg">{product.name}</h4>
                                 <p className="text-sm opacity-80 capitalize">
-                                  Category: {product.category} • Qty: {product.quantity} {((product as any).unit ?? '')}
+                                  Category: {product.category} • Qty: {product.quantity} {((product as InventoryItem).unit ?? '')}
                                 </p>
                                 <p className="text-sm font-semibold mt-1">
                                   Expires: {product.expiryDate}

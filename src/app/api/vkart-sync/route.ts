@@ -4,6 +4,17 @@ import { enhanceProductData, QRProduct, parseMeasure } from '@/lib/productUtils'
 
 export const revalidate = 0;
 
+function getErrorMessage(e: unknown): string {
+  if (!e) return '';
+  if (typeof e === 'string') return e;
+  if (e instanceof Error) return e.message;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
+}
+
 const DEFAULT_VKART_BASE = 'http://localhost:3001';
 
 function mapStatus(days: number) {
@@ -15,7 +26,6 @@ function mapStatus(days: number) {
 
 async function fetchVkartOrders(email: string, updated_since?: string) {
   const base = process.env.VKART_BASE_URL || DEFAULT_VKART_BASE;
-  const url = new URL('/api/orders/sync', base);
   // Use POST for retrieval because the Vkart server's POST handler will
   // return matching orders for the supplied email regardless of whether
   // the server persists to an in-memory store or to Supabase. Some Vkart
@@ -29,7 +39,7 @@ async function fetchVkartOrders(email: string, updated_since?: string) {
   const timeout = setTimeout(() => controller.abort(), 5000);
 
   try {
-    const body: any = { email };
+    const body: { email: string; updated_since?: string } = { email };
     if (updated_since) body.updated_since = updated_since;
 
     const res = await fetch(new URL('/api/orders/sync', base).toString(), {
@@ -134,26 +144,37 @@ export async function POST() {
         try {
           // Check for existing matching product.
           // Prefer deduping by order_id when available (prevents re-importing the same Vkart order).
-          let selectQuery = supabaseServer
-            .from('inventory_items')
-            .select('id, quantity')
-            .eq('user_id', userId)
-            .eq('product_name', enhanced.name)
-            .eq('is_consumed', false)
-            .limit(1);
+          let existing: { id?: string; quantity?: number } | null = null;
+          let selectErr: unknown = null;
 
-          // If the incoming order has an order id, include it in the match to avoid re-importing the same order
           if (orderId) {
-            selectQuery = (selectQuery as any).eq('order_id', orderId);
+            const resp = await supabaseServer
+              .from('inventory_items')
+              .select('id, quantity')
+              .eq('user_id', userId)
+              .eq('product_name', enhanced.name)
+              .eq('is_consumed', false)
+              .eq('order_id', orderId)
+              .limit(1)
+              .maybeSingle();
+            existing = resp.data as { id?: string; quantity?: number } | null;
+            selectErr = resp.error as unknown;
           } else {
-            // Fallback: also match by expiry_date when orderId is missing
-            selectQuery = (selectQuery as any).eq('expiry_date', enhanced.expiryDate);
+            const resp = await supabaseServer
+              .from('inventory_items')
+              .select('id, quantity')
+              .eq('user_id', userId)
+              .eq('product_name', enhanced.name)
+              .eq('is_consumed', false)
+              .eq('expiry_date', enhanced.expiryDate)
+              .limit(1)
+              .maybeSingle();
+            existing = resp.data as { id?: string; quantity?: number } | null;
+            selectErr = resp.error as unknown;
           }
 
-          const { data: existing, error: selectErr } = await selectQuery.maybeSingle();
-
           if (selectErr) {
-            results.errors.push(`Select error for ${enhanced.name}: ${selectErr.message}`);
+            results.errors.push(`Select error for ${enhanced.name}: ${getErrorMessage(selectErr)}`);
             continue;
           }
 
