@@ -120,16 +120,6 @@ export default function SettingsPage() {
     showSaved();
   }
 
-  function toggleAutoFetchVkart() {
-    const next = {
-      ...settings,
-      autoFetchVkartOrders: !settings.autoFetchVkartOrders,
-    } as AppSettings;
-    setSettings(next);
-    saveSettings({ autoFetchVkartOrders: next.autoFetchVkartOrders });
-    showSaved();
-  }
-
   function showSaved() {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -382,37 +372,6 @@ export default function SettingsPage() {
                   <span
                     className={`block w-6 h-6 bg-white rounded-full shadow transform transition-transform ${
                       settings.expirySettings.prioritizeExpiring ? 'translate-x-7' : 'translate-x-1'
-                    }`}
-                  ></span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Sync / Integrations */}
-          <div className="bg-white/80 backdrop-blur-xl border border-emerald-100 rounded-3xl p-6 shadow-xl">
-            <div className="flex items-center gap-2 mb-4">
-              <Calendar className="w-6 h-6 text-indigo-600" />
-              <h2 className="text-2xl font-bold text-gray-900">Sync & Integrations</h2>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-indigo-50 rounded-xl">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-800">Auto-fetch Vkart orders</h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    When enabled, NoshNurture will automatically fetch orders from Vkart (by your email) when you open the Scanner page. Disable to import manually only.
-                  </p>
-                </div>
-                <button
-                  onClick={toggleAutoFetchVkart}
-                  className={`ml-4 w-14 h-8 rounded-full transition-all ${
-                    settings.autoFetchVkartOrders ? 'bg-indigo-600' : 'bg-gray-300'
-                  }`}
-                >
-                  <span
-                    className={`block w-6 h-6 bg-white rounded-full shadow transform transition-transform ${
-                      settings.autoFetchVkartOrders ? 'translate-x-7' : 'translate-x-1'
                     }`}
                   ></span>
                 </button>
