@@ -42,15 +42,15 @@ async function fetchVkartOrders(email: string, updated_since?: string) {
     const body: { email: string; updated_since?: string } = { email };
     if (updated_since) body.updated_since = updated_since;
 
-    const res = await fetch(new URL('/api/orders/sync', base).toString(), {
+    const fetchUrl = new URL('/api/orders/sync', base).toString();
+    const res = await fetch(fetchUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-
     clearTimeout(timeout);
-    if (!res.ok) throw new Error(`Vkart responded with ${res.status}`);
+    if (!res.ok) throw new Error(`Vkart responded with ${res.status} at ${fetchUrl}`);
     const json = await res.json();
     return json.orders || [];
   } catch (e) {
@@ -87,7 +87,22 @@ export async function POST() {
       console.warn('[vkart-sync] Could not read last sync timestamp:', (e as Error).message);
     }
 
-    const orders = await fetchVkartOrders(email, updated_since);
+    let orders: unknown[] = [];
+    try {
+      orders = await fetchVkartOrders(email, updated_since);
+    } catch (e) {
+      const msg = getErrorMessage(e);
+      console.error('[vkart-sync] Network error when fetching Vkart orders:', msg);
+      return NextResponse.json({ error: `Failed to reach Vkart service: ${msg}. Please ensure VKART_BASE_URL is set to a reachable Vkart instance.` }, { status: 502 });
+    }
+
+    // If this is the first time syncing (no updated_since), avoid importing the user's entire
+    // order history by default — most users only want their most recent order. Keep only the
+    // latest order unless the caller specifically requested full history.
+    if (!updated_since && Array.isArray(orders) && orders.length > 1) {
+      console.log(`[vkart-sync] No previous sync; fetched ${orders.length} orders — importing only the most recent one by default.`);
+      orders = (orders as unknown[]).slice(0, 1);
+    }
 
     if (!Array.isArray(orders) || orders.length === 0) {
       return NextResponse.json({ imported: 0, updated: 0, skipped: 0, errors: [], count: 0 });
@@ -95,26 +110,45 @@ export async function POST() {
 
     const results = { imported: 0, updated: 0, skipped: 0, errors: [] as string[] };
 
-    for (const order of orders) {
-      const orderId = order.orderId || order.order_id || '';
-      const orderDate = order.orderDate || order.order_date || new Date().toISOString();
-      const products = Array.isArray(order.products) ? order.products : [];
+    for (const rawOrder of orders) {
+      // Validate/normalize the incoming order shape (guard against unknown)
+      const orderRec = (rawOrder as Record<string, unknown>) || {};
+      const orderId = typeof orderRec['orderId'] === 'string' ? (orderRec['orderId'] as string)
+        : typeof orderRec['order_id'] === 'string' ? (orderRec['order_id'] as string)
+        : '';
+      const orderDate = typeof orderRec['orderDate'] === 'string' ? (orderRec['orderDate'] as string)
+        : typeof orderRec['order_date'] === 'string' ? (orderRec['order_date'] as string)
+        : new Date().toISOString();
+      const products = Array.isArray(orderRec['products']) ? (orderRec['products'] as unknown[]) : [];
 
-      for (const p of products) {
+      for (const pItem of products) {
         // Normalize incoming product shape to QRProduct
+        const prod = (pItem as Record<string, unknown>) || {};
         // Try to capture any measure/weight info if present in the incoming product
-        const rawName = String(p.name || p.product_name || 'Unknown Product');
-        const rawExpiry = String(p.expiryDate || p.expiry_date || p.expiry || new Date().toISOString());
-        const rawQty = Number(p.quantity || p.qty || 1);
+        const rawName = typeof prod['name'] === 'string' ? (prod['name'] as string)
+          : typeof prod['product_name'] === 'string' ? (prod['product_name'] as string)
+          : 'Unknown Product';
+        const rawExpiry = typeof prod['expiryDate'] === 'string' ? (prod['expiryDate'] as string)
+          : typeof prod['expiry_date'] === 'string' ? (prod['expiry_date'] as string)
+          : typeof prod['expiry'] === 'string' ? (prod['expiry'] as string)
+          : new Date().toISOString();
+        const rawQty = typeof prod['quantity'] === 'number' ? (prod['quantity'] as number)
+          : typeof prod['qty'] === 'number' ? (prod['qty'] as number)
+          : 1;
         // Possible fields that may contain weight/volume info: weight, size, weightLabel, volume
-        const weightStr = p.weight || p.weight_label || p.size || p.volume || p.weightLabel || null;
-        const parsedMeasure = parseMeasure(String(weightStr || ''));
+        const weightCandidate = typeof prod['weight'] === 'string' ? (prod['weight'] as string)
+          : typeof prod['weight_label'] === 'string' ? (prod['weight_label'] as string)
+          : typeof prod['size'] === 'string' ? (prod['size'] as string)
+          : typeof prod['volume'] === 'string' ? (prod['volume'] as string)
+          : typeof prod['weightLabel'] === 'string' ? (prod['weightLabel'] as string)
+          : null;
+        const parsedMeasure = parseMeasure(String(weightCandidate || ''));
 
         const qr: QRProduct = {
           name: rawName,
           expiryDate: rawExpiry,
           quantity: rawQty,
-          category: String(p.category || 'other'),
+          category: typeof prod['category'] === 'string' ? (prod['category'] as string) : 'other',
           measure: parsedMeasure ?? undefined,
         };
 
@@ -192,11 +226,65 @@ export async function POST() {
               results.updated += 1;
             }
           } else {
-            const { error: insertErr } = await supabaseServer.from('inventory_items').insert([dbRow]);
-            if (insertErr) {
-              results.errors.push(`Insert failed for ${enhanced.name}: ${insertErr.message}`);
+            // No exact match found. As a last-resort, look for similar recent items with same
+            // product_name (case-insensitive) and a close expiry date to avoid duplicates caused
+            // by missing order_id or slightly different expiry formatting.
+            const { data: candidates } = await supabaseServer
+              .from('inventory_items')
+              .select('id, quantity, expiry_date')
+              .eq('user_id', userId)
+              .ilike('product_name', enhanced.name)
+              .eq('is_consumed', false)
+              .limit(5);
+
+            let matchedCandidate: { id?: string; quantity?: number; expiry_date?: string } | null = null;
+            if (Array.isArray(candidates)) {
+              const parseDate = (s?: string) => {
+                try {
+                  return s ? new Date(s) : null;
+                } catch {
+                  return null;
+                }
+              };
+
+              const targetExpiry = parseDate(enhanced.expiryDate);
+              for (const c of candidates) {
+                const crec = c as Record<string, unknown> | null;
+                const cExpiry = parseDate(crec && typeof crec['expiry_date'] === 'string' ? (crec['expiry_date'] as string) : undefined);
+                if (cExpiry && targetExpiry) {
+                  const diffDays = Math.abs(Math.floor((cExpiry.getTime() - targetExpiry.getTime()) / (1000 * 60 * 60 * 24)));
+                  if (diffDays <= 3) {
+                    matchedCandidate = {
+                      id: (crec && typeof crec['id'] === 'string') ? (crec['id'] as string) : undefined,
+                      quantity: (crec && typeof crec['quantity'] === 'number') ? (crec['quantity'] as number) : (crec && typeof crec['quantity'] === 'string' ? Number(crec['quantity']) : undefined),
+                      expiry_date: (crec && typeof crec['expiry_date'] === 'string') ? (crec['expiry_date'] as string) : undefined,
+                    };
+                    break;
+                  }
+                }
+              }
+            }
+
+            if (matchedCandidate && matchedCandidate.id) {
+              // Merge into matched candidate
+              const newQty = Number(matchedCandidate.quantity || 0) + Number(enhanced.quantity || 0);
+              const { error: updateErr } = await supabaseServer
+                .from('inventory_items')
+                .update({ quantity: newQty })
+                .eq('id', matchedCandidate.id);
+
+              if (updateErr) {
+                results.errors.push(`Update failed for ${enhanced.name}: ${updateErr.message}`);
+              } else {
+                results.updated += 1;
+              }
             } else {
-              results.imported += 1;
+              const { error: insertErr } = await supabaseServer.from('inventory_items').insert([dbRow]);
+              if (insertErr) {
+                results.errors.push(`Insert failed for ${enhanced.name}: ${insertErr.message}`);
+              } else {
+                results.imported += 1;
+              }
             }
           }
         } catch (e) {
