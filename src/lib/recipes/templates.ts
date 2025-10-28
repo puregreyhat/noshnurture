@@ -9,6 +9,9 @@ export type RecipeSuggestion = {
   missingIngredients: string[];
   instructions: string[];
   score: number;
+  cuisine?: string; // e.g., "Indian", "Italian", "East Asian"
+  matchedIngredientCount?: number; // Number of ingredients you have
+  totalIngredientCount?: number; // Total ingredients needed
 };
 
 export type Pantry = {
@@ -120,6 +123,9 @@ export function curryTemplate(ctx: TemplateContext): RecipeSuggestion | null {
     missingIngredients: Array.from(STAPLES).filter(s => !pantry.available.has(s)),
     instructions,
     score: scoreByUsage(pantry, used),
+    cuisine: "Indian",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 
@@ -160,6 +166,9 @@ export function stirFryTemplate(ctx: TemplateContext): RecipeSuggestion | null {
     missingIngredients: ["soy sauce"].filter(s => !pantry.available.has(s)),
     instructions,
     score: scoreByUsage(pantry, used),
+    cuisine: "East Asian",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 
@@ -197,6 +206,9 @@ export function pastaTemplate(ctx: TemplateContext): RecipeSuggestion | null {
     missingIngredients: [],
     instructions,
     score: scoreByUsage({ expiring: pantry.expiring, available: pantry.available }, used),
+    cuisine: "Italian",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 
@@ -228,6 +240,9 @@ export function omeletTemplate(ctx: TemplateContext): RecipeSuggestion | null {
     missingIngredients: [],
     instructions,
     score: scoreByUsage(pantry, used),
+    cuisine: "International",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 
@@ -262,6 +277,9 @@ export function friedRiceTemplate(ctx: TemplateContext): RecipeSuggestion | null
     missingIngredients: [],
     instructions,
     score: scoreByUsage(pantry, used),
+    cuisine: "East Asian",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 
@@ -295,6 +313,9 @@ export function saladTemplate(ctx: TemplateContext): RecipeSuggestion | null {
     missingIngredients: [],
     instructions,
     score: scoreByUsage(pantry, used),
+    cuisine: "International",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 
@@ -327,6 +348,9 @@ export function soupTemplate(ctx: TemplateContext): RecipeSuggestion | null {
     missingIngredients: [],
     instructions,
     score: scoreByUsage(pantry, used),
+    cuisine: "International",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 
@@ -361,6 +385,9 @@ export function wrapTemplate(ctx: TemplateContext): RecipeSuggestion | null {
     missingIngredients: [],
     instructions,
     score: scoreByUsage(pantry, used),
+    cuisine: "International",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 
@@ -392,6 +419,9 @@ export function traybakeTemplate(ctx: TemplateContext): RecipeSuggestion | null 
     missingIngredients: [],
     instructions,
     score: scoreByUsage(pantry, used),
+    cuisine: "European",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 
@@ -420,6 +450,9 @@ export function smoothieTemplate(ctx: TemplateContext): RecipeSuggestion | null 
     missingIngredients: [],
     instructions,
     score: scoreByUsage(pantry, used),
+    cuisine: "International",
+    matchedIngredientCount: used.length,
+    totalIngredientCount: ingredients.length,
   };
 }
 

@@ -34,7 +34,18 @@ export async function generateSuggestions(items: InventoryItemDB[]): Promise<Rec
     if (r) candidates.push(r);
   }
 
-  // Sort by score desc, then time asc
-  candidates.sort((a, b) => (b.score - a.score) || (a.totalTime - b.totalTime));
+  // Sort by:
+  // 1. Matched ingredient count (descending - recipes using more of your items first)
+  // 2. Score (descending - prioritize expiring items)
+  // 3. Total time (ascending - quicker recipes first)
+  candidates.sort((a, b) => {
+    const matchedCountDiff = (b.matchedIngredientCount || 0) - (a.matchedIngredientCount || 0);
+    if (matchedCountDiff !== 0) return matchedCountDiff;
+    
+    const scoreDiff = b.score - a.score;
+    if (scoreDiff !== 0) return scoreDiff;
+    
+    return a.totalTime - b.totalTime;
+  });
   return candidates.slice(0, 5);
 }

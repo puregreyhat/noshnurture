@@ -166,7 +166,7 @@ export async function GET(
           const mapped: any = {
             id: r.id || recipeId,
             title: r.title || r.name || (r.raw && r.raw.TranslatedRecipeName) || 'Untitled',
-            image: '',
+            image: r.image || r.image_url || r.imageUrl || '',
             imageType: '',
             servings: r.servings || 0,
             readyInMinutes: (r.prep_time_minutes || r.prepTime || 0) + (r.cook_time_minutes || r.cookTime || r.total_minutes || r.totalMinutes || 0),

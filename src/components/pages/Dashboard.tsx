@@ -31,6 +31,7 @@ export default function FoodDashboard() {
     readyInMinutes?: number;
     servings?: number;
   }>>([]);
+
   const [localAIReady, setLocalAIReady] = useState<boolean>(false);
   const [enhanced, setEnhanced] = useState<Array<{ 
     title: string; 
@@ -41,10 +42,12 @@ export default function FoodDashboard() {
     servings?: number;
   }>>([]);
   const [discoverMore, setDiscoverMore] = useState(false);
+  const [showOnlySugran, setShowOnlySugran] = useState<boolean>(true);
   const [wasteReducedKg, setWasteReducedKg] = useState<number | null>(null);
   const [estimatedMealsPerWeek, setEstimatedMealsPerWeek] = useState<number>(0);
+  const [selectedCuisines, setSelectedCuisines] = useState<Set<string>>(new Set());
 
-  // Fetch inventory from Supabase
+  // Fetch inventory from Supabase and recently consumed items (for waste calculations)
   useEffect(() => {
     const fetchInventory = async () => {
       if (!user) {
@@ -71,73 +74,47 @@ export default function FoodDashboard() {
       } finally {
         setLoading(false);
       }
-
     };
-    // end fetchInventory
 
-    // invoke loader
-    fetchInventory();
-    // also fetch recently consumed items for "waste reduced" calculation
-    if (user) {
-      (async () => {
-        try {
-          const supabase = createClient();
-          const d = new Date();
-          d.setDate(d.getDate() - 30);
-          const iso = d.toISOString();
-          const { data: consumed, error: consErr } = await supabase
-            .from('inventory_items')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('is_consumed', true)
-            .gte('consumed_date', iso)
-            .order('consumed_date', { ascending: false });
-          if (!consErr) setConsumedItems30d(consumed || []);
-        } catch (e) {
-          console.warn('Failed to fetch consumed items', e);
+    const fetchConsumedItems = async () => {
+      if (!user) return;
+      try {
+        const supabase = createClient();
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        const iso = d.toISOString();
+        const { data: consumed, error: consErr } = await supabase
+          .from('inventory_items')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('is_consumed', true)
+          .gte('consumed_date', iso)
+          .order('consumed_date', { ascending: false });
+
+        if (consErr) {
+          console.error('Error fetching consumed items:', consErr);
+        } else {
+          setConsumedItems30d(consumed || []);
         }
-      })();
-    }
+      } catch (err) {
+        console.error('Failed to load consumed items:', err);
+      }
+    };
+
+    // invoke loaders
+    fetchInventory();
+    fetchConsumedItems();
   }, [user]);
 
-  // Calculate summary stats from real data
-  const summary = {
-    foodTracked: inventoryItems.length,
-    expiringSoon: inventoryItems.filter(item => item.days_until_expiry <= 7 && item.days_until_expiry >= 0).length,
-    wasteReduced: wasteReducedKg === null ? '—' : `${wasteReducedKg.toFixed(1)} kg`,
-  };
-
-  // Group items by product name and sum quantities
-  const groupedInventory = inventoryItems.reduce((acc, item) => {
-    const existing = acc.find(i => i.product_name === item.product_name);
-    if (existing) {
-      existing.quantity += item.quantity;
-    } else {
-      acc.push({ ...item });
-    }
-    return acc;
-  }, [] as InventoryItemDB[]);
-
-  // Get items expiring soon (within 7 days), grouped by product
-  const expiringItemsGrouped = groupedInventory
-    .filter(item => item.days_until_expiry <= 7 && item.days_until_expiry >= 0)
-    .slice(0, 6)
-    .map(item => ({
-      name: item.product_name,
-      expiry: `${item.days_until_expiry} day${item.days_until_expiry !== 1 ? 's' : ''}`,
-      action: "Use",
-      quantity: item.quantity,
-      unit: item.unit,
-      tags: item.tags,
-    }));
-
-  // Fetch recipe suggestions from our server (which proxies to Sugran)
+  // Fetch recipe suggestions (separate effect; depends on inventory length so suggestions update when items change)
   useEffect(() => {
-    if (!user) return;
     const fetchSuggestions = async () => {
       setRecipeLoading(true);
       try {
-        const resp = await fetch('/api/recipes/suggestions?source=sugran');
+        const params = new URLSearchParams();
+        params.set('source', 'sugran');
+        if (showOnlySugran) params.set('all', 'true');
+        const resp = await fetch(`/api/recipes/suggestions?${params.toString()}`);
         if (resp.ok) {
           const j = await resp.json();
           setSuggestions(Array.isArray(j.suggestions) ? j.suggestions : []);
@@ -151,7 +128,7 @@ export default function FoodDashboard() {
       }
     };
     fetchSuggestions();
-  }, [user, inventoryItems.length]);
+  }, [user, inventoryItems.length, showOnlySugran]);
 
   // Estimate meals/week and compute wasteReduced when consumed items change or inventory updates
   useEffect(() => {
@@ -193,6 +170,22 @@ export default function FoodDashboard() {
   // ];
 
   // mealPlan placeholder removed — using dynamic suggestions/estimates instead
+
+  // lightweight derived values used by the UI
+  const expiringItemsGrouped = inventoryItems.map((it) => ({
+    name: (it.product_name || 'Item') as string,
+    quantity: (it.quantity ?? 0) as number,
+    unit: (it.unit ?? '') as string,
+    expiry: typeof it.days_until_expiry === 'number' ? `${String(it.days_until_expiry)} days` : 'Unknown',
+    action: typeof it.days_until_expiry === 'number' && it.days_until_expiry <= 3 ? 'Use soon' : 'Plan',
+    tags: (it as any).tags || [],
+  }));
+
+  const summary = {
+    foodTracked: inventoryItems.length,
+    expiringSoon: expiringItemsGrouped.filter((x) => x.expiry !== 'Unknown' && Number(String(x.expiry).split(' ')[0]) <= 7).length,
+    wasteReduced: wasteReducedKg !== null ? Math.round(wasteReducedKg) : 0,
+  };
 
   return (
     <div className="min-h-screen font-['Poppins'] bg-gradient-to-br from-emerald-50 via-white to-green-100">
@@ -250,7 +243,7 @@ export default function FoodDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {expiringItemsGrouped.map((item, idx) => (
+              {expiringItemsGrouped.slice(0, 6).map((item, idx) => (
                 <motion.div
                   key={idx}
                   initial={{ opacity: 0, y: 20 }}
@@ -279,7 +272,7 @@ export default function FoodDashboard() {
                   </div>
                   {item.tags && item.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-3">
-                      {item.tags.slice(0, 3).map((tag, i) => (
+                      {item.tags.slice(0, 3).map((tag: string, i: number) => (
                         <span key={i} className="text-xs px-2 py-0.5 bg-emerald-100 rounded-full text-emerald-700">
                           {tag}
                         </span>
@@ -295,35 +288,149 @@ export default function FoodDashboard() {
         {/* Recipes Section (restored) */}
         <Section title="Recipe Suggestions" icon={<Utensils className="text-orange-500" />}>
           <div className="p-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+              {/* Cuisine Filter */}
+              <div className="flex flex-wrap gap-2">
+                {['Indian', 'East Asian', 'Italian', 'European', 'International'].map((cuisine) => (
+                  <button
+                    key={cuisine}
+                    onClick={() => {
+                      const newSet = new Set(selectedCuisines);
+                      if (newSet.has(cuisine)) {
+                        newSet.delete(cuisine);
+                      } else {
+                        newSet.add(cuisine);
+                      }
+                      setSelectedCuisines(newSet);
+                    }}
+                    className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
+                      selectedCuisines.has(cuisine)
+                        ? 'bg-orange-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 border border-gray-200 hover:border-orange-300'
+                    }`}
+                  >
+                    {cuisine}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                className="text-sm px-3 py-1 rounded-full bg-white/90 text-gray-800 border shadow-sm hover:shadow-md whitespace-nowrap"
+                onClick={() => setShowOnlySugran((v) => !v)}
+                aria-pressed={!showOnlySugran}
+              >
+                {showOnlySugran ? 'Showing Sugran recipes only · Show all' : 'Showing all recipes · Show Sugran only'}
+              </button>
+            </div>
+
             {recipeLoading ? (
               <div className="text-center py-6 text-gray-500">Loading recipes...</div>
             ) : suggestions.length === 0 ? (
               <div className="text-center py-6 text-gray-500">No recipe suggestions yet. Try adding items to inventory or run the Sugran test.</div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {suggestions.map((s, i) => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {(
+                  showOnlySugran
+                    ? suggestions.filter((s) => {
+                        if (!s) return false;
+                        if (typeof s.id === 'string' && s.id.startsWith('sugran-')) return true;
+                        if (typeof s.source === 'string' && s.source.includes('sugran')) return true;
+                        if (typeof s.image === 'string' && s.image.includes('sugran.vercel.app')) return true;
+                        return false;
+                      })
+                    : suggestions
+                )
+                  .filter((s) => {
+                    // Filter by selected cuisines (if none selected, show all)
+                    if (selectedCuisines.size === 0) return true;
+                    const sCuisine = (s as unknown as Record<string, unknown>).cuisine as string | undefined;
+                    return sCuisine && selectedCuisines.has(sCuisine);
+                  })
+                  .slice(0, 6)
+                  .map((s, i) => (
                   <motion.div
                     key={String(s.id || i)}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: i * 0.04 }}
-                    className="rounded-xl bg-white/90 border p-4 shadow-md hover:shadow-lg"
+                    className="rounded-xl bg-white/90 border p-4 shadow-md hover:shadow-lg overflow-hidden relative"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-800">{s.title}</h4>
-                        {s.source && <p className="text-xs text-gray-500 mt-1">Source: {s.source}</p>}
-                        {(() => {
-                          const sObj = s as unknown as Record<string, unknown>;
-                          if (typeof sObj.matched !== 'undefined') {
-                            return <p className="text-xs text-green-600 mt-1">Matched: {String(sObj.matched)}</p>;
-                          }
-                          return null;
-                        })()}
+                    {/* Image area with overlayed View button and title */}
+                    <div className="relative mb-3 rounded-md overflow-hidden bg-gray-100 shadow-sm">
+                      {s.image ? (
+                        <img src={String(s.image)} alt={String(s.title)} className="w-full h-64 object-cover block" />
+                      ) : (
+                        <div className="w-full h-64 flex items-center justify-center bg-gray-50 text-gray-300">No image</div>
+                      )}
+
+                      {/* stronger gradient overlay at bottom for title and ensure readability */}
+                      <div className="absolute left-0 right-0 bottom-0 h-32 bg-gradient-to-t from-black/60 to-transparent pointer-events-none" />
+
+                      {/* title overlay with semi-opaque pill for contrast */}
+                      <div className="absolute left-4 bottom-4 text-white">
+                        <div className="bg-black/55 px-3 py-1 rounded-md backdrop-blur-sm">
+                          <h4 className="font-semibold text-sm drop-shadow-md leading-tight">{s.title}</h4>
+                          {(() => {
+                            const sObj = s as unknown as Record<string, unknown>;
+                            const source = String(sObj.source || '');
+                            const cuisine = String(sObj.cuisine || '');
+                            return (
+                              <p className="text-xs opacity-90 mt-0.5">
+                                {source && `Source: ${source}`}
+                                {source && cuisine && ' · '}
+                                {cuisine && `${cuisine}`}
+                              </p>
+                            );
+                          })()}
+                        </div>
                       </div>
+
+                      {/* matched ingredients badge top-left (overlay) */}
+                      {(() => {
+                        const sObj = s as unknown as Record<string, unknown>;
+                        const matched = sObj.matched as number | undefined;
+                        const matchedIngredientCount = sObj.matchedIngredientCount as number | undefined;
+                        const totalIngredientCount = sObj.totalIngredientCount as number | undefined;
+                        
+                        if (typeof matched === 'number' && matched > 0) {
+                          return (
+                            <div className="absolute left-3 top-3 inline-flex items-center gap-2 bg-emerald-600 text-white text-xs font-medium px-2 py-1 rounded-full shadow-md">
+                              <span>Matched</span>
+                              <span className="bg-white/20 px-2 py-0.5 rounded-md">{String(matched)}</span>
+                            </div>
+                          );
+                        }
+                        
+                        // Only show badge if both counts are valid and greater than 0
+                        if (typeof matchedIngredientCount === 'number' && 
+                            typeof totalIngredientCount === 'number' && 
+                            matchedIngredientCount > 0 && 
+                            totalIngredientCount > 0) {
+                          return (
+                            <div className="absolute left-3 top-3 inline-flex items-center gap-2 bg-emerald-600 text-white text-xs font-medium px-2 py-1 rounded-full shadow-md">
+                              <span className="font-bold">{matchedIngredientCount}/{totalIngredientCount}</span>
+                              <span className="text-xs">ingredients</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      {/* View button (top-right) */}
                       {s.id ? (
-                        <Link href={`/recipes/${encodeURIComponent(String(s.id))}`} className="text-sm text-blue-600">View</Link>
+                        <Link
+                          href={`/recipes/${encodeURIComponent(String(s.id))}`}
+                          aria-label={`View ${String(s.title)}`}
+                          className="absolute right-3 top-3 inline-flex items-center gap-2 px-3 py-1.5 bg-white/95 text-gray-800 text-sm font-medium rounded-full shadow-lg hover:bg-white/100 hover:scale-105 transition-transform"
+                        >
+                          View
+                        </Link>
                       ) : null}
+                    </div>
+
+                    {/* meta area (kept minimal since matched is shown on image) */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1" />
                     </div>
                   </motion.div>
                 ))}

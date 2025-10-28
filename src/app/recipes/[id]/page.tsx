@@ -312,6 +312,14 @@ export default function RecipeDetailPage() {
   const totalCount = recipe.extendedIngredients.length;
   const ownershipPercentage = Math.round((ownedCount / totalCount) * 100);
 
+  // Sort ingredients so that owned/matched ingredients appear first
+  const sortedIngredients = recipe.extendedIngredients.slice().sort((a, b) => {
+    const aOwned = checkIngredientOwnership(a.name) ? 1 : 0;
+    const bOwned = checkIngredientOwnership(b.name) ? 1 : 0;
+    // put owned items first
+    return bOwned - aOwned;
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-green-100">
       {/* Animated background */}
@@ -419,7 +427,7 @@ export default function RecipeDetailPage() {
                 </div>
               </div>
               <ul className="space-y-2">
-                {recipe.extendedIngredients.map((ingredient) => {
+                {sortedIngredients.map((ingredient) => {
                   const owned = checkIngredientOwnership(ingredient.name);
                   const conf = ingredientConfidences[(ingredient.name || ingredient.original || '').toLowerCase()] || 'low';
                   return (
@@ -474,24 +482,42 @@ export default function RecipeDetailPage() {
               {recipe.analyzedInstructions.length > 0 ? (
                 <ol className="space-y-6">
                   {recipe.analyzedInstructions[0].steps.map((step) => (
-                    <li key={step.number} className="flex gap-4 items-start">
-                      <div className="flex-shrink-0 w-10 h-10 bg-purple-600 text-white rounded-full flex items-center justify-center font-bold text-sm mt-1">
-                        {step.number}
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-gray-700 leading-relaxed">{step.step}</p>
-                        {step.length && (
-                          <p className="text-sm text-gray-500 mt-2 flex items-center gap-1">
-                            <Clock className="w-4 h-4" />
-                            {step.length.number} {step.length.unit}
-                          </p>
-                        )}
+                    <li key={step.number} className="relative">
+                      {/* decorative blurred background */}
+                      <div className="absolute -inset-3 rounded-2xl blur-3xl opacity-20 bg-gradient-to-r from-purple-300 to-violet-400" />
+                      <div className="relative flex gap-4 items-start p-4 rounded-2xl bg-white/70">
+                        <div className="flex-shrink-0 w-10 h-10 bg-purple-600 text-white rounded-full flex items-center justify-center font-bold text-sm mt-1">
+                          {step.number}
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-gray-700 leading-relaxed">{step.step}</p>
+                          {step.length && (
+                            <p className="text-sm text-gray-500 mt-2 flex items-center gap-1">
+                              <Clock className="w-4 h-4" />
+                              {step.length.number} {step.length.unit}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </li>
                   ))}
                 </ol>
               ) : (
-                <div className="prose max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: recipe.summary }} />
+                // Split summary by dot and show each sentence as a blurred card
+                <div className="space-y-4">
+                  {String(recipe.summary || '')
+                    .split(/\.(?:\s+|$)/)
+                    .map(s => s.trim())
+                    .filter(Boolean)
+                    .map((sentence, idx) => (
+                      <div key={idx} className="relative">
+                        <div className="absolute -inset-3 rounded-2xl blur-3xl opacity-20 bg-gradient-to-r from-purple-300 to-violet-400" />
+                        <div className="relative p-4 rounded-2xl bg-white/70">
+                          <p className="text-gray-700 leading-relaxed">{sentence.trim()}{sentence.endsWith('.') ? '' : '.'}</p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
               )}
             </div>
 
