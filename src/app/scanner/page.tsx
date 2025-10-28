@@ -275,11 +275,15 @@ export default function ScannerPage() {
       ? (scannedData as EnhancedScannedData).products
       : (scannedData as ScannedData).products.map((p) => enhanceProductData(p as QRProduct));
 
+    // Filter out basic always-present items (water, etc.) before saving
+    const { shouldIgnoreProduct } = await import('@/lib/ignoreList');
+    const filteredItems = itemsToSave.filter(item => !shouldIgnoreProduct(item.name, item.tags));
+
     // Prepare DB rows
     const orderId = scannedData.orderId || '';
     const orderDate = scannedData.orderDate || '';
     const userId = user.id;
-    const dbRows = itemsToSave.map((item) => ({
+    const dbRows = filteredItems.map((item) => ({
       user_id: userId,
       order_id: orderId,
       order_date: orderDate,
@@ -304,7 +308,9 @@ export default function ScannerPage() {
         alert('❌ Failed to save items: ' + error.message);
         return;
       }
-      alert(`✅ Successfully added ${itemsToSave.length} items to your inventory!`);
+      const savedCount = dbRows.length;
+      const skippedCount = itemsToSave.length - savedCount;
+      alert(`✅ Successfully added ${savedCount} items to your inventory${skippedCount > 0 ? ` (skipped ${skippedCount} basic items)` : ''}!`);
       window.location.href = '/';
     } catch (err) {
       const error = err as Error;

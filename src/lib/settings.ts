@@ -18,6 +18,10 @@ export type AppSettings = {
     cuisine: string[]; // empty = all
     mealType: string[]; // empty = all (breakfast, lunch, dinner, snack, dessert)
   };
+  // Which recipe source to use for suggestions
+  // Note: Spoonacular provides full instructions & nutrition data but is deprecated
+  // in this project due to API limits. Prefer our local `sugran` service.
+  recipeSource?: 'spoonacular' | 'recipes-site' | 'sugran';
   // Expiry preferences
   expirySettings: {
     warningDays: number; // days before expiry to warn
@@ -44,6 +48,11 @@ const defaults: AppSettings = {
     cuisine: [],
     mealType: [],
   },
+  // NOTE: Spoonacular is deprecated for now; prefer our local Sugran service by default.
+  // Spoonacular still has the most complete nutrition/instructions payloads, but
+  // we avoid it to prevent external API limits. Use 'spoonacular' only if you
+  // intentionally re-enable the external provider.
+  recipeSource: 'sugran',
   expirySettings: {
     warningDays: 7,
     prioritizeExpiring: true,

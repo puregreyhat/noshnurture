@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import Image from "next/image";
 import Link from "next/link";
 import {
   Bell,
@@ -21,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function FoodDashboard() {
   const { user } = useAuth();
   const [inventoryItems, setInventoryItems] = useState<InventoryItemDB[]>([]);
+  const [consumedItems30d, setConsumedItems30d] = useState<InventoryItemDB[]>([]);
   const [loading, setLoading] = useState(true);
   const [recipeLoading, setRecipeLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<Array<{ 
@@ -41,6 +41,8 @@ export default function FoodDashboard() {
     servings?: number;
   }>>([]);
   const [discoverMore, setDiscoverMore] = useState(false);
+  const [wasteReducedKg, setWasteReducedKg] = useState<number | null>(null);
+  const [estimatedMealsPerWeek, setEstimatedMealsPerWeek] = useState<number>(0);
 
   // Fetch inventory from Supabase
   useEffect(() => {
@@ -69,93 +71,40 @@ export default function FoodDashboard() {
       } finally {
         setLoading(false);
       }
-    };
 
+    };
+    // end fetchInventory
+
+    // invoke loader
     fetchInventory();
+    // also fetch recently consumed items for "waste reduced" calculation
+    if (user) {
+      (async () => {
+        try {
+          const supabase = createClient();
+          const d = new Date();
+          d.setDate(d.getDate() - 30);
+          const iso = d.toISOString();
+          const { data: consumed, error: consErr } = await supabase
+            .from('inventory_items')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('is_consumed', true)
+            .gte('consumed_date', iso)
+            .order('consumed_date', { ascending: false });
+          if (!consErr) setConsumedItems30d(consumed || []);
+        } catch (e) {
+          console.warn('Failed to fetch consumed items', e);
+        }
+      })();
+    }
   }, [user]);
-
-  // Fetch recipe suggestions from API
-  useEffect(() => {
-    const loadRecipes = async () => {
-      try {
-        setRecipeLoading(true);
-        const res = await fetch('/api/recipes/suggestions');
-        if (!res.ok) throw new Error('Failed to fetch recipes');
-        const json = await res.json();
-        setSuggestions((json?.suggestions || []).map((r: Record<string, unknown>) => ({ 
-          title: typeof r.title === 'string' ? r.title : '', 
-          image: typeof r.image === 'string' ? r.image : '', 
-          id: (typeof r.id === 'number' || typeof r.id === 'string') ? r.id : undefined,
-          source: typeof r.source === 'string' ? r.source : '',
-          readyInMinutes: typeof r.readyInMinutes === 'number' ? r.readyInMinutes : 0,
-          servings: typeof r.servings === 'number' ? r.servings : 0
-        })));
-      } catch (e) {
-        console.error('Recipe suggestions error', e);
-      } finally {
-        setRecipeLoading(false);
-      }
-    };
-    loadRecipes();
-  }, []);
-
-  // Probe local AI availability if enabled
-  useEffect(() => {
-    (async () => {
-      if (typeof window === 'undefined') return;
-      if (!getSettings().useLocalAIGenerator) return;
-      const ok = await isLocalModelAvailable();
-      setLocalAIReady(ok);
-    })();
-  }, []);
-
-  async function handleLocalAIGenerate() {
-    try {
-      // Build a simple prompt from expiring items
-      const expiring = groupedInventory
-        .filter(i => i.days_until_expiry >= 0 && i.days_until_expiry <= 7)
-        .map(i => i.product_name)
-        .slice(0, 6);
-      const prompt = `ingredients: ${expiring.join(', ')}\nrecipe:`;
-      const out = await generateLocalRecipe(prompt);
-      if (!out) {
-        alert('Local AI model is not ready to generate yet. Place model.json and vocab.json under /public/models/recipe_rnn/.');
-        return;
-      }
-      // For now, we keep the UI simple: append a placeholder enhanced card
-      setEnhanced(prev => [{ title: 'AI-Generated Recipe', image: suggestions[0]?.image }, ...prev]);
-    } catch (e) {
-      console.error('Local AI generation failed', e);
-    }
-  }
-
-  async function handleDiscoverMore() {
-    setDiscoverMore(true);
-    try {
-      // Re-fetch suggestions to get fresh Spoonacular results
-      const res = await fetch('/api/recipes/suggestions');
-      if (!res.ok) throw new Error('Failed to fetch more');
-      const json = await res.json();
-      setSuggestions((json?.suggestions || []).map((r: Record<string, unknown>) => ({ 
-        title: typeof r.title === 'string' ? r.title : '', 
-        image: typeof r.image === 'string' ? r.image : '', 
-        id: typeof r.id === 'number' ? r.id : 0,
-        source: typeof r.source === 'string' ? r.source : '',
-        readyInMinutes: typeof r.readyInMinutes === 'number' ? r.readyInMinutes : 0,
-        servings: typeof r.servings === 'number' ? r.servings : 0
-      })));
-    } catch (e) {
-      console.error('Discover more error', e);
-    } finally {
-      setDiscoverMore(false);
-    }
-  }
 
   // Calculate summary stats from real data
   const summary = {
     foodTracked: inventoryItems.length,
     expiringSoon: inventoryItems.filter(item => item.days_until_expiry <= 7 && item.days_until_expiry >= 0).length,
-    wasteReduced: "3.8 kg", // Keep static for now
+    wasteReduced: wasteReducedKg === null ? '—' : `${wasteReducedKg.toFixed(1)} kg`,
   };
 
   // Group items by product name and sum quantities
@@ -182,6 +131,56 @@ export default function FoodDashboard() {
       tags: item.tags,
     }));
 
+  // Fetch recipe suggestions from our server (which proxies to Sugran)
+  useEffect(() => {
+    if (!user) return;
+    const fetchSuggestions = async () => {
+      setRecipeLoading(true);
+      try {
+        const resp = await fetch('/api/recipes/suggestions?source=sugran');
+        if (resp.ok) {
+          const j = await resp.json();
+          setSuggestions(Array.isArray(j.suggestions) ? j.suggestions : []);
+        } else {
+          console.error('Failed to load suggestions', resp.status);
+        }
+      } catch (e) {
+        console.error('Error fetching suggestions', e);
+      } finally {
+        setRecipeLoading(false);
+      }
+    };
+    fetchSuggestions();
+  }, [user, inventoryItems.length]);
+
+  // Estimate meals/week and compute wasteReduced when consumed items change or inventory updates
+  useEffect(() => {
+    // helper: convert common units to kg (estimates)
+    function toKg(quantity: number | undefined, unit: string | undefined) {
+      const q = Number(quantity || 0);
+      if (!unit) return q * 0.2; // assume pieces-ish
+      const u = unit.toLowerCase();
+      if (u.includes('kg')) return q;
+      if (u.includes('g')) return q / 1000;
+      if (u.includes('gram')) return q / 1000;
+      if (u.includes('ml')) return q / 1000; // approximate density 1
+      if (u.includes('l')) return q; // liters ~ kg (water) approximate
+      if (u.includes('pcs') || u.includes('pc') || u.includes('piece') || u.includes('count')) return q * 0.2; // avg 200g each
+      // fallback: assume 200g each
+      return q * 0.2;
+    }
+
+    // estimate total edible mass in pantry
+    const totalKg = inventoryItems.reduce((acc, it) => acc + toKg(it.quantity, it.unit), 0);
+    // assume 0.5 kg per meal
+    const mealsPerWeek = Math.max(0, Math.floor((totalKg / 0.5)));
+    setEstimatedMealsPerWeek(mealsPerWeek);
+
+    // compute waste reduced as total mass of items consumed in last 30 days
+    const consumedKg = consumedItems30d.reduce((acc, it) => acc + toKg(it.quantity, it.unit), 0);
+    setWasteReducedKg(consumedKg);
+  }, [inventoryItems, consumedItems30d]);
+
   // const recipes = [
   //   {
   //     title: "Tomato Pasta",
@@ -193,11 +192,7 @@ export default function FoodDashboard() {
   //   },
   // ];
 
-  const mealPlan = [
-    { day: "Mon", meal: "Pasta" },
-    { day: "Tue", meal: "Salad" },
-    { day: "Wed", meal: "Rice & Curry" },
-  ];
+  // mealPlan placeholder removed — using dynamic suggestions/estimates instead
 
   return (
     <div className="min-h-screen font-['Poppins'] bg-gradient-to-br from-emerald-50 via-white to-green-100">
@@ -297,128 +292,80 @@ export default function FoodDashboard() {
           )}
         </Section>
 
-        {/* Recipes Section */}
+        {/* Recipes Section (restored) */}
         <Section title="Recipe Suggestions" icon={<Utensils className="text-orange-500" />}>
-          <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
-            {getSettings().useLocalAIGenerator && (
-              <div className="flex items-center gap-2">
-                <p className="text-sm text-gray-600">
-                  Local AI {localAIReady ? '✓' : '✗'}
-                </p>
-                <button
-                  onClick={handleLocalAIGenerate}
-                  className="text-sm px-3 py-1.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 shadow-md"
-                >
-                  Generate with local AI
-                </button>
+          <div className="p-4">
+            {recipeLoading ? (
+              <div className="text-center py-6 text-gray-500">Loading recipes...</div>
+            ) : suggestions.length === 0 ? (
+              <div className="text-center py-6 text-gray-500">No recipe suggestions yet. Try adding items to inventory or run the Sugran test.</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {suggestions.map((s, i) => (
+                  <motion.div
+                    key={String(s.id || i)}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: i * 0.04 }}
+                    className="rounded-xl bg-white/90 border p-4 shadow-md hover:shadow-lg"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-gray-800">{s.title}</h4>
+                        {s.source && <p className="text-xs text-gray-500 mt-1">Source: {s.source}</p>}
+                        {typeof (s as any).matched !== 'undefined' && (
+                          <p className="text-xs text-green-600 mt-1">Matched: {(s as any).matched}</p>
+                        )}
+                      </div>
+                      {s.id ? (
+                        <Link href={`/recipes/${encodeURIComponent(String(s.id))}`} className="text-sm text-blue-600">View</Link>
+                      ) : null}
+                    </div>
+                  </motion.div>
+                ))}
               </div>
             )}
-            <button
-              onClick={handleDiscoverMore}
-              disabled={discoverMore}
-              className="text-sm px-3 py-1.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-md disabled:opacity-50"
-            >
-              {discoverMore ? 'Loading...' : '🔍 Discover More Recipes'}
-            </button>
           </div>
-          {recipeLoading ? (
-            <div className="text-center py-8 text-gray-500">Finding recipes that use expiring items...</div>
-          ) : suggestions.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No suggestions yet. Add items or adjust expiry windows.</div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {[...enhanced, ...suggestions].map((recipe, i) => {
-              // Template recipes have non-numeric IDs (curry-..., stirfry-..., etc.)
-              // Spoonacular recipes have numeric IDs
-              const isNumericId = recipe.id && /^\d+$/.test(recipe.id.toString());
-              const hasDetails = recipe.id && isNumericId;
-              const isTemplate = !isNumericId;
-              
-              return (
-              <motion.div
-                key={recipe.id || i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ scale: 1.03 }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="rounded-3xl overflow-hidden bg-white/80 backdrop-blur-xl border border-gray-100 shadow-lg hover:shadow-2xl transition-all"
-              >
-                <Image
-                  src={recipe.image || 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop'}
-                  alt={recipe.title}
-                  width={800}
-                  height={176}
-                  className="w-full h-44 object-cover transition-transform hover:scale-105"
-                />
-                <div className="p-5">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-800 text-lg">
-                        {recipe.title}
-                      </h3>
-                      {recipe.source && (
-                        <p className="text-xs text-gray-500 mt-1">via {recipe.source}</p>
-                      )}
-                      {isTemplate && (
-                        <span className="inline-block text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full mt-1">
-                          Quick Idea
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 text-sm text-gray-600 mb-3">
-                    {recipe.readyInMinutes && (
-                      <span className="flex items-center gap-1">
-                        🕐 {recipe.readyInMinutes} mins
-                      </span>
-                    )}
-                    {recipe.servings && (
-                      <span className="flex items-center gap-1">
-                        👥 {recipe.servings} servings
-                      </span>
-                    )}
-                  </div>
-                  {hasDetails ? (
-                    <Link 
-                      href={`/recipes/${recipe.id}`}
-                      className="block w-full text-sm px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 shadow-md transition-colors font-semibold text-center"
-                    >
-                      View Recipe →
-                    </Link>
-                  ) : (
-                    <Link 
-                      href={recipe.id ? `/recipes/template/${recipe.id}` : '#'}
-                      className="block w-full text-sm px-3 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 shadow-md transition-colors font-semibold text-center"
-                    >
-                      See Recipe Idea →
-                    </Link>
-                  )}
-                </div>
-              </motion.div>
-            )})}
-
-          </div>
-          )}
         </Section>
 
         {/* Meal Plan Section */}
         <Section title="Meal Planning Overview" icon={<CalendarDays className="text-blue-600" />}>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            {mealPlan.map((plan, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.5, delay: i * 0.05 }}
-                className="rounded-xl bg-white/90 border border-gray-100 p-5 shadow-md hover:shadow-lg transition-all"
-              >
-                <p className="font-semibold text-gray-800 text-lg">
-                  {plan.day}
-                </p>
-                <p className="text-gray-500 text-sm">{plan.meal}</p>
-              </motion.div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.03 }}
+              transition={{ duration: 0.5 }}
+              className="rounded-xl bg-white/90 border border-gray-100 p-5 shadow-md hover:shadow-lg transition-all"
+            >
+              <p className="text-sm text-gray-500">Possible Recipes Now</p>
+              <p className="text-2xl font-bold text-gray-800 mt-2">{suggestions.length}</p>
+              <p className="text-xs text-gray-400 mt-1">recipes suggested from your pantry</p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.03 }}
+              transition={{ duration: 0.5, delay: 0.05 }}
+              className="rounded-xl bg-white/90 border border-gray-100 p-5 shadow-md hover:shadow-lg transition-all"
+            >
+              <p className="text-sm text-gray-500">Estimated Meals / Week</p>
+              <p className="text-2xl font-bold text-gray-800 mt-2">{estimatedMealsPerWeek}</p>
+              <p className="text-xs text-gray-400 mt-1">based on pantry size (approx)</p>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              whileHover={{ scale: 1.03 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="rounded-xl bg-white/90 border border-gray-100 p-5 shadow-md hover:shadow-lg transition-all"
+            >
+              <p className="text-sm text-gray-500">Items Expiring Soon</p>
+              <p className="text-2xl font-bold text-gray-800 mt-2">{summary.expiringSoon}</p>
+              <p className="text-xs text-gray-400 mt-1">within 7 days</p>
+            </motion.div>
           </div>
           <div className="mt-6 text-right">
             <button className="text-sm px-5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-md">
@@ -430,9 +377,9 @@ export default function FoodDashboard() {
         {/* Sustainability Stats */}
         <Section title="Sustainability Stats" icon={<Globe2 className="text-green-700" />}>
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
-            <StatWidget label="Food Waste Saved" value="3.8 kg" />
-            <StatWidget label="CO₂ Saved" value="9.4 kg" />
-            <StatWidget label="Money Saved" value="₹520" />
+            <StatWidget label="Food Waste Saved" value={wasteReducedKg === null ? '—' : `${wasteReducedKg.toFixed(1)} kg`} />
+            <StatWidget label="CO₂ Saved (est.)" value={wasteReducedKg === null ? '—' : `${(wasteReducedKg * 2.5).toFixed(1)} kg`} />
+            <StatWidget label="Money Saved (est.)" value={wasteReducedKg === null ? '—' : `₹${Math.round(wasteReducedKg * 150)}`} />
           </div>
         </Section>
 

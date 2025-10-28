@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -25,10 +25,20 @@ export default function TemplateRecipePage() {
   
   const recipeId = params.id as string;
 
+  const router = useRouter();
+
   const [loading, setLoading] = useState(true);
   const [recipe, setRecipe] = useState<RecipeTemplate | null>(null);
 
   useEffect(() => {
+    // If the incoming id looks like a numeric Spoonacular id, a local id
+    // (`local-123`) or a legacy `recipes-site:123` id, redirect to the
+    // main recipe detail page. This avoids accidentally rendering the
+    // generic template view when a detailed/local recipe was intended.
+    if (/^\d+$/.test(recipeId) || /^local-\d+$/.test(recipeId) || /^recipes-site:\d+$/.test(recipeId)) {
+      router.replace(`/recipes/${encodeURIComponent(recipeId)}`);
+      return;
+    }
     // Parse template ID to extract recipe type and ingredients
     const parts = recipeId.split('-');
     const recipeType = parts[0];

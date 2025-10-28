@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   ArrowLeft,
   Clock,
@@ -17,6 +16,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { normalizeIngredientName, normalizeIngredientNameWithScore, levenshtein } from '@/lib/ingredients/normalize';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface RecipeDetail {
@@ -75,6 +75,9 @@ export default function RecipeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [userIngredients, setUserIngredients] = useState<string[]>([]);
+  const [normalizedUserIngredients, setNormalizedUserIngredients] = useState<Set<string>>(new Set());
+  const [ownedIngredientNames, setOwnedIngredientNames] = useState<Set<string>>(new Set());
+  const [ingredientConfidences, setIngredientConfidences] = useState<Record<string, 'high' | 'medium' | 'low'>>({});
   const [cooking, setCooking] = useState(false);
 
   useEffect(() => {
@@ -111,28 +114,121 @@ export default function RecipeDetailPage() {
 
       if (error) throw error;
 
-      // Extract canonical ingredient names from tags
+      // Extract canonical ingredient names from tags (and fallback plain tags)
       const ingredients: string[] = [];
       data?.forEach((item) => {
         const tags = item.tags || [];
         tags.forEach((tag: string) => {
+          if (typeof tag !== 'string') return;
           if (tag.startsWith('canonical:')) {
-            ingredients.push(tag.replace('canonical:', ''));
+            ingredients.push(tag.replace('canonical:', '').toLowerCase());
+          } else {
+            const t = tag.trim().toLowerCase();
+            if (t) ingredients.push(t);
           }
         });
+        // also include product_name as a fallback
+        const pname = (item as any).product_name;
+        if (pname && typeof pname === 'string') {
+          ingredients.push(String(pname).trim().toLowerCase());
+        }
       });
-      setUserIngredients([...new Set(ingredients)]);
+      const uniq = Array.from(new Set(ingredients));
+      setUserIngredients(uniq);
+
+      // Normalize user ingredients to canonical forms for better matching
+      try {
+        const norms = new Set<string>();
+        await Promise.all(uniq.map(async (ing) => {
+          try {
+            const n = await normalizeIngredientName(ing, { prefer: 'fuzzy' });
+            norms.add(n.toLowerCase());
+          } catch {
+            norms.add(ing.toLowerCase());
+          }
+        }));
+        setNormalizedUserIngredients(norms);
+      } catch (e) {
+        // ignore normalization errors
+        setNormalizedUserIngredients(new Set(uniq.map(s => s.toLowerCase())));
+      }
     } catch (err) {
       console.error('Error fetching user ingredients:', err);
     }
   };
 
   const checkIngredientOwnership = (ingredientName: string): boolean => {
+    // Use precomputed confidences: consider high/medium as owned
+    const key = ingredientName.toLowerCase().trim();
+    const conf = ingredientConfidences[key];
+    if (conf) return conf === 'high' || conf === 'medium';
+
+    // Fallback: existing ownedIngredientNames set
+    if (ownedIngredientNames.size > 0) {
+      const n = ingredientName.toLowerCase().trim();
+      return Array.from(ownedIngredientNames).some(o => n.includes(o) || o === n);
+    }
+
+    // Final fallback: simple tag substring match
     const normalized = ingredientName.toLowerCase().trim();
-    return userIngredients.some((ing) =>
-      normalized.includes(ing.toLowerCase())
-    );
+    return userIngredients.some((ing) => normalized.includes(ing.toLowerCase()));
   };
+
+  // When recipe or normalizedUserIngredients change, compute which recipe ingredients are owned
+  useEffect(() => {
+    if (!recipe || !recipe.extendedIngredients || normalizedUserIngredients.size === 0) {
+      setOwnedIngredientNames(new Set());
+      setIngredientConfidences({});
+      return;
+    }
+
+    (async () => {
+      const owned = new Set<string>();
+      const confs: Record<string, 'high' | 'medium' | 'low'> = {};
+      await Promise.all(recipe.extendedIngredients.map(async (ing) => {
+        try {
+          const rawName = String(ing.name || ing.original || '');
+          const normObj = await normalizeIngredientNameWithScore(rawName, { prefer: 'fuzzy' });
+          const recipeCanon = normObj.canonical.toLowerCase();
+
+          // compare against user's canonical tokens
+          let bestDist = Infinity;
+          let bestUser: string | null = null;
+          for (const u of Array.from(normalizedUserIngredients)) {
+            const userTok = u.toLowerCase();
+            if (userTok === recipeCanon) {
+              bestDist = 0;
+              bestUser = userTok;
+              break;
+            }
+            const d = levenshtein(recipeCanon, userTok);
+            if (d < bestDist) {
+              bestDist = d;
+              bestUser = userTok;
+            }
+          }
+
+          // assign confidence: 0-1 => high, 2 => medium, >2 => low
+          let conf: 'high' | 'medium' | 'low' = 'low';
+          if (bestDist <= 1) conf = 'high';
+          else if (bestDist === 2) conf = 'medium';
+          else conf = 'low';
+
+          confs[(ing.name || ing.original || '').toLowerCase()] = conf;
+
+          if (bestUser && bestDist <= 2) {
+            // Consider this owned (high or medium)
+            owned.add(bestUser);
+            return;
+          }
+        } catch (e) {
+          // ignore and continue
+        }
+      }));
+      setOwnedIngredientNames(owned);
+      setIngredientConfidences(confs);
+    })();
+  }, [recipe, normalizedUserIngredients]);
 
   const handleMarkAsCooked = async () => {
     setCooking(true);
@@ -234,39 +330,38 @@ export default function RecipeDetailPage() {
           Back to Recipes
         </Link>
 
-        {/* Hero section */}
-        <div className="bg-white/70 backdrop-blur-xl border border-emerald-100 rounded-3xl shadow-xl overflow-hidden mb-8">
-          {/* Recipe image */}
-          <div className="relative h-96 w-full">
-            <Image
-              src={recipe.image}
-              alt={recipe.title}
-              fill
-              className="object-cover"
-              priority
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-              <h1 className="text-4xl font-bold mb-4">{recipe.title}</h1>
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-full">
-                  <Clock className="w-5 h-5" />
+          {/* Hero section (purple theme like screenshot) */}
+          <div className="rounded-3xl overflow-hidden mb-8 shadow-xl">
+            <div className="bg-gradient-to-r from-purple-500 to-violet-500 p-8 text-white">
+              <div className="flex items-center justify-between mb-4">
+                <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-medium">Quick Idea</span>
+              </div>
+              <h1 className="text-4xl font-extrabold mb-3">{recipe.title}</h1>
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-sm">
+                  <Clock className="w-4 h-4" />
                   <span>{recipe.readyInMinutes} mins</span>
                 </div>
-                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-full">
-                  <Users className="w-5 h-5" />
+                <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-sm">
+                  <Users className="w-4 h-4" />
                   <span>{recipe.servings} servings</span>
                 </div>
-                <div className="flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-full">
-                  <Heart className="w-5 h-5" />
+                <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-sm">
+                  <Heart className="w-4 h-4" />
                   <span>{recipe.healthScore}/100</span>
                 </div>
                 {ownershipPercentage > 0 && (
-                  <div className="flex items-center gap-2 bg-emerald-500/90 backdrop-blur-md px-4 py-2 rounded-full">
-                    <CheckCircle2 className="w-5 h-5" />
+                  <div className="flex items-center gap-2 bg-white/20 px-3 py-1 rounded-full text-sm">
+                    <CheckCircle2 className="w-4 h-4" />
                     <span>{ownershipPercentage}% owned</span>
                   </div>
                 )}
+              </div>
+            </div>
+            <div className="p-4 bg-white">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-purple-600 mt-0.5" />
+                <p className="text-sm text-gray-700">This is a quick recipe idea generated from your ingredients. Feel free to adapt it to your taste and cooking style!</p>
               </div>
             </div>
           </div>
@@ -301,16 +396,15 @@ export default function RecipeDetailPage() {
               ))}
             </div>
           </div>
-        </div>
 
         {/* Main content grid */}
         <div className="grid md:grid-cols-3 gap-8">
-          {/* Ingredients */}
+          {/* Ingredients (left card) */}
           <div className="md:col-span-1">
-            <div className="bg-white/70 backdrop-blur-xl border border-emerald-100 rounded-3xl shadow-xl p-6 sticky top-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <ChefHat className="w-6 h-6 text-emerald-600" />
-                Ingredients
+            <div className="bg-white rounded-3xl shadow-xl p-6 sticky top-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <span className="inline-block w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center">🍽️</span>
+                Your Ingredients
               </h2>
               <div className="mb-4 p-3 bg-emerald-50 rounded-xl">
                 <p className="text-sm text-emerald-700 font-medium">
@@ -323,79 +417,70 @@ export default function RecipeDetailPage() {
                   />
                 </div>
               </div>
-              <ul className="space-y-3">
+              <ul className="space-y-2">
                 {recipe.extendedIngredients.map((ingredient) => {
                   const owned = checkIngredientOwnership(ingredient.name);
+                  const conf = ingredientConfidences[(ingredient.name || ingredient.original || '').toLowerCase()] || 'low';
                   return (
-                    <li
-                      key={ingredient.id}
-                      className={`flex items-start gap-2 p-2 rounded-lg ${
-                        owned ? 'bg-emerald-50' : 'bg-gray-50'
-                      }`}
-                    >
-                      {owned ? (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                      ) : (
-                        <div className="w-5 h-5 border-2 border-gray-300 rounded-full mt-0.5 flex-shrink-0" />
-                      )}
-                      <span
-                        className={`text-sm ${
-                          owned ? 'text-emerald-900 font-medium' : 'text-gray-700'
-                        }`}
-                      >
-                        {ingredient.original}
-                      </span>
+                    <li key={ingredient.id} className="flex items-center justify-between gap-3 p-2 rounded-lg bg-gray-50">
+                      <div className="flex items-center gap-3">
+                        <span className={`w-2 h-2 rounded-full ${owned ? 'bg-emerald-600' : 'bg-gray-300'}`} />
+                        <div>
+                          <div className={`text-sm ${owned ? 'text-emerald-900 font-medium' : 'text-gray-700'}`}>{ingredient.name}</div>
+                          <div className="mt-1">
+                            <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full ${conf === 'high' ? 'bg-emerald-100 text-emerald-800' : conf === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
+                              {conf === 'high' ? 'High' : conf === 'medium' ? 'Medium' : 'Low'} match
+                            </span>
+                          </div>
+                          <div className="text-xs text-gray-500">{ingredient.original}</div>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-400">{ingredient.amount || ''}</div>
                     </li>
                   );
                 })}
               </ul>
 
-              {/* Mark as cooked button */}
-              <button
-                onClick={handleMarkAsCooked}
-                disabled={cooking || ownedCount === 0}
-                className="w-full mt-6 flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-semibold"
-              >
-                {cooking ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Marking as cooked...
-                  </>
-                ) : (
-                  <>
-                    <Flame className="w-5 h-5" />
-                    I Cooked This!
-                  </>
+              <div className="mt-6">
+                <button
+                  onClick={handleMarkAsCooked}
+                  disabled={cooking || ownedCount === 0}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-semibold"
+                >
+                  {cooking ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Marking as cooked...
+                    </>
+                  ) : (
+                    <>
+                      <Flame className="w-5 h-5" />
+                      I Cooked This!
+                    </>
+                  )}
+                </button>
+                {ownedCount === 0 && (
+                  <p className="text-xs text-gray-500 mt-2 text-center">You don't have any ingredients for this recipe</p>
                 )}
-              </button>
-              {ownedCount === 0 && (
-                <p className="text-xs text-gray-500 mt-2 text-center">
-                  You don&apos;t have any ingredients for this recipe
-                </p>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* Instructions & Nutrition */}
+          {/* Instructions & Nutrition (right) */}
           <div className="md:col-span-2 space-y-8">
-            {/* Instructions */}
-            <div className="bg-white/70 backdrop-blur-xl border border-emerald-100 rounded-3xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Cooking Instructions
-              </h2>
+            <div className="bg-white rounded-3xl shadow-xl p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Cooking Instructions</h2>
               {recipe.analyzedInstructions.length > 0 ? (
                 <ol className="space-y-6">
                   {recipe.analyzedInstructions[0].steps.map((step) => (
-                    <li key={step.number} className="flex gap-4">
-                      <div className="flex-shrink-0 w-8 h-8 bg-emerald-600 text-white rounded-full flex items-center justify-center font-bold">
+                    <li key={step.number} className="flex gap-4 items-start">
+                      <div className="flex-shrink-0 w-10 h-10 bg-purple-600 text-white rounded-full flex items-center justify-center font-bold text-sm mt-1">
                         {step.number}
                       </div>
                       <div className="flex-1">
-                        <p className="text-gray-700 leading-relaxed">
-                          {step.step}
-                        </p>
+                        <p className="text-gray-700 leading-relaxed">{step.step}</p>
                         {step.length && (
-                          <p className="text-sm text-emerald-600 mt-2 flex items-center gap-1">
+                          <p className="text-sm text-gray-500 mt-2 flex items-center gap-1">
                             <Clock className="w-4 h-4" />
                             {step.length.number} {step.length.unit}
                           </p>
@@ -405,10 +490,7 @@ export default function RecipeDetailPage() {
                   ))}
                 </ol>
               ) : (
-                <div
-                  className="prose max-w-none text-gray-700"
-                  dangerouslySetInnerHTML={{ __html: recipe.summary }}
-                />
+                <div className="prose max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: recipe.summary }} />
               )}
             </div>
 

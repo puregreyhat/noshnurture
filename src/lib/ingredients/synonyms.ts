@@ -39,3 +39,12 @@ export const SYNONYMS: Record<string, string> = {
   raddist: "radish",
   reddish: "radish",
 };
+
+// Add a few small locality / item mappings
+export const LOCAL_SYNONYMS: Record<string,string> = {
+  pav: 'bread',
+  'pav bhaji': 'pav bhaji masala',
+};
+
+// merge local synonyms into SYNONYMS for runtime use (keeps single export shape)
+Object.assign(SYNONYMS, LOCAL_SYNONYMS);

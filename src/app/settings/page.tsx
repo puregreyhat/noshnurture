@@ -125,6 +125,13 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 2000);
   }
 
+  function setRecipeSource(src: 'spoonacular' | 'recipes-site') {
+    const next = { ...settings, recipeSource: src } as AppSettings;
+    setSettings(next);
+    saveSettings({ recipeSource: src });
+    showSaved();
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-green-100">
       {/* Animated background */}
@@ -319,6 +326,33 @@ export default function SettingsPage() {
                   );
                 })}
               </div>
+            </div>
+          </div>
+
+          {/* Recipe Source */}
+          <div className="bg-white/80 backdrop-blur-xl border border-emerald-100 rounded-3xl p-6 shadow-xl">
+            <div className="flex items-center gap-2 mb-4">
+              <Globe className="w-6 h-6 text-blue-600" />
+              <h2 className="text-2xl font-bold text-gray-900">Recipe Source</h2>
+            </div>
+            <p className="text-sm text-gray-600 mb-3">Choose which recipe provider NoshNurture should use for suggestions</p>
+            <div className="flex gap-3">
+              <button
+                // Spoonacular is temporarily deprecated to avoid API limits
+                disabled
+                aria-disabled
+                title="Deprecated: external API calls disabled"
+                className={`px-4 py-2 rounded-xl font-medium opacity-60 cursor-not-allowed ${settings.recipeSource === 'spoonacular' ? 'bg-gray-300 text-gray-700' : 'bg-gray-100'}`}
+              >
+                Spoonacular
+                <span className="ml-2 text-xs px-2 py-0.5 bg-red-100 text-red-700 rounded-full">Deprecated</span>
+              </button>
+              <button
+                onClick={() => setRecipeSource('recipes-site')}
+                className={`px-4 py-2 rounded-xl font-medium ${settings.recipeSource === 'recipes-site' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
+              >
+                Use Local Recipes Site
+              </button>
             </div>
           </div>
 

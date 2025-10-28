@@ -154,6 +154,12 @@ export async function POST() {
 
         const enhanced = enhanceProductData(qr);
 
+        const { shouldIgnoreProduct } = await import('@/lib/ignoreList');
+        if (shouldIgnoreProduct(enhanced.name, enhanced.tags)) {
+          results.skipped += 1;
+          continue; // skip inserting basic items like water
+        }
+
         const userId = user.id;
 
         // Prepare DB row

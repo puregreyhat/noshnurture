@@ -25,8 +25,10 @@ async function getExpiringIngredients(items: Record<string, unknown>[]): Promise
   return Array.from(canonicals).slice(0, 6);
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const url = new URL(request.url)
+    const source = (url.searchParams.get('source') || 'spoonacular').toString()
     // Get authenticated user
     const supabaseServer = await createClient();
     const { data: { user }, error: authError } = await supabaseServer.auth.getUser();
@@ -60,57 +62,62 @@ export async function GET() {
     const templateSuggestions = await generateSuggestions(items);
     console.log(`[Recipes API] Generated ${templateSuggestions.length} template suggestions`);
     
-    // Optionally fetch Spoonacular suggestions for variety
-    let spoonSuggestions: Record<string, unknown>[] = [];
-    const expiringIngredients = await getExpiringIngredients(items);
-    
-    if (expiringIngredients.length > 0 && process.env.SPOONACULAR_API_KEY) {
+  // Optionally fetch Spoonacular suggestions for variety (DEPRECATED)
+  // We intentionally do not call Spoonacular for now to avoid API limits.
+  const expiringIngredients = await getExpiringIngredients(items);
+
+  // If client asked to use our Sugran recipe service, proxy inventory and return those suggestions
+    if (source === 'sugran' || source === 'recipes-site') {
       try {
-        console.log(`[Recipes API] Fetching from Spoonacular with ingredients: ${expiringIngredients.join(', ')}`);
-        
-        // Call Spoonacular API directly instead of internal route
-        const ingredientsStr = expiringIngredients.join(',+');
-        const url = `https://api.spoonacular.com/recipes/findByIngredients?apiKey=${process.env.SPOONACULAR_API_KEY}&ingredients=${ingredientsStr}&number=3&ranking=2&ignorePantry=false`;
-        
-        // Add timeout
+        const SUGRAN = process.env.SUGRAN_URL || process.env.RECIPES_SITE_URL || 'https://sugran.vercel.app';
+        // Build simple inventory array of product names
+        const inventoryNames: string[] = (items || [])
+          .slice(0, 100)
+          .map(it => String(it.product_name || it.name || '').trim())
+          .filter(Boolean);
+
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-        
-        const spoonRes = await fetch(url, { signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const resp = await fetch(`${SUGRAN.replace(/\/$/, '')}/api/recipes/search`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ inventory: inventoryNames, limit: 8 }),
+          signal: controller.signal,
+        });
         clearTimeout(timeoutId);
-        
-        if (spoonRes.ok) {
-          const data = await spoonRes.json();
-          // Transform to our format
-          spoonSuggestions = (Array.isArray(data) ? data : []).map((r: Record<string, unknown>) => ({
-            id: r.id,
-            title: r.title,
-            image: r.image,
-            usedIngredients: Array.isArray(r.usedIngredients) ? r.usedIngredients.map((i: Record<string, unknown>) => i.name) : [],
-            missedIngredients: Array.isArray(r.missedIngredients) ? r.missedIngredients.map((i: Record<string, unknown>) => i.name) : [],
-            source: "spoonacular",
-            readyInMinutes: r.readyInMinutes,
-            servings: r.servings,
-          }));
-          console.log(`[Recipes API] Successfully fetched ${spoonSuggestions.length} Spoonacular recipes`);
+        if (resp.ok) {
+          const j = await resp.json();
+          const resultsArr = Array.isArray(j.results) ? j.results as any[] : [];
+          const mapped = resultsArr.map(r => {
+            const recipe = r.recipe || r;
+            const title = recipe.name || recipe.title || 'Untitled';
+            const image = '';
+            // Make id path-safe and indicate origin
+            const id = recipe.id ? `sugran-${String(recipe.id)}` : undefined;
+            const matched = typeof r.matched === 'number' ? r.matched : (Array.isArray(r.matched) ? r.matched : []);
+            const missing = Array.isArray(r.missing) ? r.missing : [];
+            return {
+              title,
+              image,
+              id,
+              source: 'sugran',
+              matched,
+              missing,
+            };
+          });
+          try { console.log('[Recipes API] mapped sugran suggestion ids:', mapped.map(m => m.id)); } catch {}
+          const merged = [...templateSuggestions, ...mapped].slice(0, 8);
+          return NextResponse.json({ suggestions: merged });
         }
       } catch (e) {
-        const err = e as { name?: string; message?: string }
-        if (err.name === 'AbortError') {
-          console.log('[Recipes API] Spoonacular request timed out, using template recipes only');
-        } else {
-          console.error('[Recipes API] Spoonacular fetch failed:', err.message);
-        }
+        console.error('[Recipes API] sugran proxy failed, falling back to templates', (e as Error).message)
       }
     }
-    
-    console.log(`[Recipes API] Got ${spoonSuggestions.length} Spoonacular suggestions`);
-    
-    // Merge: templates first (reliable), then Spoonacular for variety
-    const merged = [...templateSuggestions, ...spoonSuggestions].slice(0, 8);
+    // We don't call Spoonacular right now. Return template suggestions only by default.
+    const merged = [...templateSuggestions].slice(0, 8);
     
     console.log(`[Recipes API] Returning ${merged.length} total suggestions`);
-    return NextResponse.json({ suggestions: merged });
+  return NextResponse.json({ suggestions: merged });
   } catch (e) {
     console.error('[Recipes API] Error:', e);
     const err = e as Error
