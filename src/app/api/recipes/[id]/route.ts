@@ -110,13 +110,15 @@ export async function GET(
           const r = (j && j.recipe) || j;
 
           // Prepare normalized ingredients (collapse duplicates) and formatted summary
-          let extendedIngredientsArr: any[] = [];
+          type LocalIngredientObj = { name?: string; quantity?: number; unit?: string };
+          let extendedIngredientsArr: Array<{ id: number; name: string; original: string; amount: number; unit: string; }> = [];
           try {
             if (Array.isArray(r.ingredients)) {
               // If ingredients are objects with a `name` field (our Sugran format), map directly
-              if (r.ingredients.length > 0 && typeof r.ingredients[0] === 'object' && r.ingredients[0].name) {
+              if (r.ingredients.length > 0 && typeof r.ingredients[0] === 'object' && (r.ingredients[0] as LocalIngredientObj).name) {
                 let i = 1;
-                for (const ingObj of r.ingredients) {
+                for (const ingObjRaw of r.ingredients) {
+                  const ingObj = ingObjRaw as LocalIngredientObj;
                   const nameRaw = String(ingObj.name || '').trim();
                   if (!nameRaw) continue;
                   const canon = await normalizeIngredientName(nameRaw, { prefer: 'fuzzy' });
@@ -140,7 +142,13 @@ export async function GET(
               }
             }
           } catch (e) {
-            extendedIngredientsArr = Array.isArray(r.ingredients) ? r.ingredients.map((ing: any, idx: number) => ({ id: idx + 1, name: String((ing && ing.name) || ing), original: String((ing && ing.name) || ing), amount: ing && ing.quantity ? ing.quantity : 0, unit: ing && ing.unit ? ing.unit : '' })) : [];
+            extendedIngredientsArr = Array.isArray(r.ingredients) ? r.ingredients.map((ing: unknown, idx: number) => {
+              const obj = ing as LocalIngredientObj | string;
+              const name = typeof obj === 'string' ? String(obj) : String((obj as LocalIngredientObj).name ?? obj);
+              const amount = typeof obj === 'object' && (obj as LocalIngredientObj).quantity ? (obj as LocalIngredientObj).quantity ?? 0 : 0;
+              const unit = typeof obj === 'object' && (obj as LocalIngredientObj).unit ? (obj as LocalIngredientObj).unit ?? '' : '';
+              return { id: idx + 1, name: name, original: name, amount, unit };
+            }) : [];
           }
 
           const rawText = r.description || (r.raw && (r.raw.TranslatedInstructions || r.raw.summary)) || '';

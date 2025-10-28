@@ -65,7 +65,6 @@ export async function GET(request: Request) {
   // Optionally fetch Spoonacular suggestions for variety (DEPRECATED)
   // We intentionally do not call Spoonacular for now to avoid API limits.
   const expiringIngredients = await getExpiringIngredients(items);
-
   // If client asked to use our Sugran recipe service, proxy inventory and return those suggestions
     if (source === 'sugran' || source === 'recipes-site') {
       try {
@@ -87,15 +86,16 @@ export async function GET(request: Request) {
         clearTimeout(timeoutId);
         if (resp.ok) {
           const j = await resp.json();
-          const resultsArr = Array.isArray(j.results) ? j.results as any[] : [];
-          const mapped = resultsArr.map(r => {
-            const recipe = r.recipe || r;
-            const title = recipe.name || recipe.title || 'Untitled';
+          const resultsArr = Array.isArray(j.results) ? (j.results as unknown[]) : [];
+          const mapped = resultsArr.map((r) => {
+            const rObj = r as Record<string, unknown>;
+            const recipe = (rObj.recipe as Record<string, unknown>) ?? (rObj as Record<string, unknown>);
+            const title = String((recipe.name ?? recipe.title ?? 'Untitled') as unknown);
             const image = '';
             // Make id path-safe and indicate origin
             const id = recipe.id ? `sugran-${String(recipe.id)}` : undefined;
-            const matched = typeof r.matched === 'number' ? r.matched : (Array.isArray(r.matched) ? r.matched : []);
-            const missing = Array.isArray(r.missing) ? r.missing : [];
+            const matched = typeof rObj.matched === 'number' ? (rObj.matched as number) : (Array.isArray(rObj.matched) ? (rObj.matched as unknown[]) : []);
+            const missing = Array.isArray(rObj.missing) ? (rObj.missing as unknown[]) : [];
             return {
               title,
               image,

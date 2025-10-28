@@ -44,8 +44,11 @@ export async function POST() {
         }
 
         const newTags = [...tags, canonicalTag];
+        // The Supabase client returns a PostgrestFilterBuilder which isn't typed as a
+        // Promise here, so wrap the call in an async IIFE to produce a real Promise
+        // that we can await via Promise.all below.
         updates.push(
-          supabaseServer.from('inventory_items').update({ tags: newTags }).eq('id', pid)
+          (async () => await supabaseServer.from('inventory_items').update({ tags: newTags }).eq('id', pid))()
         );
         updated += 1;
       } catch (e) {

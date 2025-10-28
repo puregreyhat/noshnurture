@@ -313,9 +313,13 @@ export default function FoodDashboard() {
                       <div className="flex-1">
                         <h4 className="font-semibold text-gray-800">{s.title}</h4>
                         {s.source && <p className="text-xs text-gray-500 mt-1">Source: {s.source}</p>}
-                        {typeof (s as any).matched !== 'undefined' && (
-                          <p className="text-xs text-green-600 mt-1">Matched: {(s as any).matched}</p>
-                        )}
+                        {(() => {
+                          const sObj = s as unknown as Record<string, unknown>;
+                          if (typeof sObj.matched !== 'undefined') {
+                            return <p className="text-xs text-green-600 mt-1">Matched: {String(sObj.matched)}</p>;
+                          }
+                          return null;
+                        })()}
                       </div>
                       {s.id ? (
                         <Link href={`/recipes/${encodeURIComponent(String(s.id))}`} className="text-sm text-blue-600">View</Link>

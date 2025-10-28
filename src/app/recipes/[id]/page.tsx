@@ -116,9 +116,10 @@ export default function RecipeDetailPage() {
 
       // Extract canonical ingredient names from tags (and fallback plain tags)
       const ingredients: string[] = [];
-      data?.forEach((item) => {
-        const tags = item.tags || [];
-        tags.forEach((tag: string) => {
+      const rows = (data || []) as Array<{ tags?: unknown[]; product_name?: string | null }>;
+      rows.forEach((item) => {
+        const tags = Array.isArray(item.tags) ? item.tags : [];
+        tags.forEach((tag) => {
           if (typeof tag !== 'string') return;
           if (tag.startsWith('canonical:')) {
             ingredients.push(tag.replace('canonical:', '').toLowerCase());
@@ -128,7 +129,7 @@ export default function RecipeDetailPage() {
           }
         });
         // also include product_name as a fallback
-        const pname = (item as any).product_name;
+        const pname = item.product_name;
         if (pname && typeof pname === 'string') {
           ingredients.push(String(pname).trim().toLowerCase());
         }

@@ -54,15 +54,8 @@ function tokensToCandidate(tokens: string[]): string | null {
   // Next, try synonyms mapping (so words like 'chilli' -> 'chili')
   for (const t of tokens) {
     if (descriptors.has(t)) continue;
-    // lazy import of SYNONYMS to avoid circular issues
-    try {
-      // require because this is JS/TS mixing context in build
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { SYNONYMS } = require('./synonyms');
-      if (SYNONYMS && SYNONYMS[t]) return SYNONYMS[t];
-    } catch {
-      // ignore
-    }
+    // Use the imported SYNONYMS mapping (avoid runtime require/circular import)
+    if (SYNONYMS && SYNONYMS[t]) return SYNONYMS[t];
   }
 
   // Fallback: return the longest non-descriptor token (likely the most specific)
