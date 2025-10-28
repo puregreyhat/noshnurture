@@ -115,13 +115,13 @@ export default function InventoryPage() {
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
             <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600" />
               <input
                 type="text"
                 placeholder="Search products..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-emerald-500 focus:outline-none transition-all"
+                className="w-full pl-12 pr-4 py-3 rounded-2xl border-2 border-emerald-300 focus:border-emerald-500 focus:outline-none transition-all bg-white text-gray-800 placeholder-gray-600"
               />
             </div>
 

@@ -131,8 +131,8 @@ export async function GET(request: Request) {
           const allRecipes = Array.isArray(allData.results) ? (allData.results as unknown[]) : [];
           console.log(`[Recipes API] Fetched ${allRecipes.length} total recipes from Sugran`);
           
-          // Map and calculate matches manually
-          const mapped = allRecipes.slice(0, 12).map((r) => {
+          // Map and calculate matches manually - process ALL recipes, not just first 12
+          const mapped = allRecipes.map((r) => {
             const recipe = r as Record<string, unknown>;
             const title = String((recipe.name ?? recipe.title ?? 'Untitled') as unknown);
             const image = String((recipe.image ?? recipe.image_url ?? (recipe as any).imageUrl ?? '') as unknown);

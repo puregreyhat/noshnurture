@@ -46,6 +46,9 @@ export default function FoodDashboard() {
   const [wasteReducedKg, setWasteReducedKg] = useState<number | null>(null);
   const [estimatedMealsPerWeek, setEstimatedMealsPerWeek] = useState<number>(0);
   const [selectedCuisines, setSelectedCuisines] = useState<Set<string>>(new Set());
+  const [availableCuisines, setAvailableCuisines] = useState<string[]>([]);
+  const [recipeSearchQuery, setRecipeSearchQuery] = useState<string>("");
+  const [recipePageIndex, setRecipePageIndex] = useState<number>(0);
 
   // Fetch inventory from Supabase and recently consumed items (for waste calculations)
   useEffect(() => {
@@ -129,6 +132,19 @@ export default function FoodDashboard() {
     };
     fetchSuggestions();
   }, [user, inventoryItems.length, showOnlySugran]);
+
+  // Extract unique cuisines from suggestions dynamically
+  useEffect(() => {
+    const cuisines = suggestions
+      .map((recipe: any) => recipe.cuisine)
+      .filter((cuisine: any) => cuisine && typeof cuisine === 'string')
+      .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index)
+      .sort();
+    
+    setAvailableCuisines(cuisines);
+    // Reset selected cuisines when available cuisines change
+    setSelectedCuisines(new Set());
+  }, [suggestions]);
 
   // Estimate meals/week and compute wasteReduced when consumed items change or inventory updates
   useEffect(() => {
@@ -266,9 +282,6 @@ export default function FoodDashboard() {
                     <p className="text-sm text-orange-600 font-medium">
                       Expires in {item.expiry}
                     </p>
-                    <button className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-all">
-                      {item.action}
-                    </button>
                   </div>
                   {item.tags && item.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-3">
@@ -288,30 +301,49 @@ export default function FoodDashboard() {
         {/* Recipes Section (restored) */}
         <Section title="Recipe Suggestions" icon={<Utensils className="text-orange-500" />}>
           <div className="p-4">
+            {/* Search Bar */}
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search recipes by name... (e.g., burger, pizza)"
+                value={recipeSearchQuery}
+                onChange={(e) => {
+                  setRecipeSearchQuery(e.target.value);
+                  setRecipePageIndex(0); // Reset to first page on search
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+              />
+            </div>
+
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
               {/* Cuisine Filter */}
               <div className="flex flex-wrap gap-2">
-                {['Indian', 'East Asian', 'Italian', 'European', 'International'].map((cuisine) => (
-                  <button
-                    key={cuisine}
-                    onClick={() => {
-                      const newSet = new Set(selectedCuisines);
-                      if (newSet.has(cuisine)) {
-                        newSet.delete(cuisine);
-                      } else {
-                        newSet.add(cuisine);
-                      }
-                      setSelectedCuisines(newSet);
-                    }}
-                    className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
-                      selectedCuisines.has(cuisine)
-                        ? 'bg-orange-600 text-white shadow-md'
-                        : 'bg-gray-100 text-gray-700 border border-gray-200 hover:border-orange-300'
-                    }`}
-                  >
-                    {cuisine}
-                  </button>
-                ))}
+                {availableCuisines.length > 0 ? (
+                  availableCuisines.map((cuisine) => (
+                    <button
+                      key={cuisine}
+                      onClick={() => {
+                        const newSet = new Set(selectedCuisines);
+                        if (newSet.has(cuisine)) {
+                          newSet.delete(cuisine);
+                        } else {
+                          newSet.add(cuisine);
+                        }
+                        setSelectedCuisines(newSet);
+                        setRecipePageIndex(0); // Reset to first page on filter change
+                      }}
+                      className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
+                        selectedCuisines.has(cuisine)
+                          ? 'bg-orange-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 border border-gray-200 hover:border-orange-300'
+                      }`}
+                    >
+                      {cuisine}
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-500 italic">Loading cuisines...</p>
+                )}
               </div>
 
               <button
@@ -327,27 +359,42 @@ export default function FoodDashboard() {
               <div className="text-center py-6 text-gray-500">Loading recipes...</div>
             ) : suggestions.length === 0 ? (
               <div className="text-center py-6 text-gray-500">No recipe suggestions yet. Try adding items to inventory or run the Sugran test.</div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {(
-                  showOnlySugran
-                    ? suggestions.filter((s) => {
-                        if (!s) return false;
-                        if (typeof s.id === 'string' && s.id.startsWith('sugran-')) return true;
-                        if (typeof s.source === 'string' && s.source.includes('sugran')) return true;
-                        if (typeof s.image === 'string' && s.image.includes('sugran.vercel.app')) return true;
-                        return false;
-                      })
-                    : suggestions
-                )
-                  .filter((s) => {
-                    // Filter by selected cuisines (if none selected, show all)
-                    if (selectedCuisines.size === 0) return true;
-                    const sCuisine = (s as unknown as Record<string, unknown>).cuisine as string | undefined;
-                    return sCuisine && selectedCuisines.has(sCuisine);
-                  })
-                  .slice(0, 6)
-                  .map((s, i) => (
+            ) : (() => {
+              // Filter recipes by source, cuisine, and search query
+              const filtered = (
+                showOnlySugran
+                  ? suggestions.filter((s) => {
+                      if (!s) return false;
+                      if (typeof s.id === 'string' && s.id.startsWith('sugran-')) return true;
+                      if (typeof s.source === 'string' && s.source.includes('sugran')) return true;
+                      if (typeof s.image === 'string' && s.image.includes('sugran.vercel.app')) return true;
+                      return false;
+                    })
+                  : suggestions
+              )
+                .filter((s) => {
+                  // Filter by selected cuisines (if none selected, show all)
+                  if (selectedCuisines.size === 0) return true;
+                  const sCuisine = (s as unknown as Record<string, unknown>).cuisine as string | undefined;
+                  return sCuisine && selectedCuisines.has(sCuisine);
+                })
+                .filter((s) => {
+                  // Filter by search query
+                  if (!recipeSearchQuery.trim()) return true;
+                  const title = String(s.title || '').toLowerCase();
+                  return title.includes(recipeSearchQuery.toLowerCase());
+                });
+
+              const itemsPerPage = 6;
+              const totalPages = Math.ceil(filtered.length / itemsPerPage);
+              const startIdx = recipePageIndex * itemsPerPage;
+              const endIdx = startIdx + itemsPerPage;
+              const displayedRecipes = filtered.slice(startIdx, endIdx);
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {displayedRecipes.map((s, i) => (
                   <motion.div
                     key={String(s.id || i)}
                     initial={{ opacity: 0, y: 8 }}
@@ -434,8 +481,39 @@ export default function FoodDashboard() {
                     </div>
                   </motion.div>
                 ))}
-              </div>
-            )}
+                  </div>
+
+                  {/* Pagination and Info */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-200">
+                    <p className="text-sm text-gray-600">
+                      Showing {displayedRecipes.length > 0 ? startIdx + 1 : 0} - {Math.min(endIdx, filtered.length)} of {filtered.length} recipes
+                    </p>
+                    
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setRecipePageIndex(Math.max(0, recipePageIndex - 1))}
+                        disabled={recipePageIndex === 0}
+                        className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        ← Previous
+                      </button>
+                      
+                      <span className="text-sm font-medium text-gray-700 px-2">
+                        Page {recipePageIndex + 1} of {totalPages}
+                      </span>
+                      
+                      <button
+                        onClick={() => setRecipePageIndex(Math.min(totalPages - 1, recipePageIndex + 1))}
+                        disabled={recipePageIndex >= totalPages - 1}
+                        className="px-4 py-2 rounded-lg bg-white border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        Next →
+                      </button>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </Section>
 

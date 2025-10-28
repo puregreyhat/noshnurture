@@ -65,20 +65,36 @@ interface RecipeDetail {
   };
 }
 
-export default function RecipeDetailPage() {
+export default function RecipePage() {
   const params = useParams();
   const router = useRouter();
-  const recipeId = params.id as string;
   const { user } = useAuth();
+
+  const recipeId = params.id as string;
 
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cooking, setCooking] = useState(false);
   const [error, setError] = useState('');
   const [userIngredients, setUserIngredients] = useState<string[]>([]);
-  const [normalizedUserIngredients, setNormalizedUserIngredients] = useState<Set<string>>(new Set());
-  const [ownedIngredientNames, setOwnedIngredientNames] = useState<Set<string>>(new Set());
-  const [ingredientConfidences, setIngredientConfidences] = useState<Record<string, 'high' | 'medium' | 'low'>>({});
-  const [cooking, setCooking] = useState(false);
+  const [normalizedUserIngredients, setNormalizedUserIngredients] = useState<string[]>([]);
+  const [ownedIngredientNames, setOwnedIngredientNames] = useState(new Set<string>());
+  const [ingredientConfidences, setIngredientConfidences] = useState<{ [key: string]: 'high' | 'medium' | 'low' }>({});
+  const [toasts, setToasts] = useState<Array<{ id: number; content: React.ReactNode; type: 'success' | 'error' | 'info' }>>([]);
+
+  function addToast(content: React.ReactNode, type: 'success' | 'error' | 'info' = 'info', timeout = 3000) {
+    const id = Date.now() + Math.floor(Math.random() * 1000);
+    setToasts((s) => [...s, { id, content, type }]);
+    if (timeout > 0) {
+      setTimeout(() => {
+        removeToast(id);
+      }, timeout);
+    }
+  }
+
+  function removeToast(id: number) {
+    setToasts((s) => s.filter((t) => t.id !== id));
+  }
 
   useEffect(() => {
     fetchRecipeDetails();
@@ -148,10 +164,10 @@ export default function RecipeDetailPage() {
             norms.add(ing.toLowerCase());
           }
         }));
-        setNormalizedUserIngredients(norms);
+        setNormalizedUserIngredients(Array.from(norms));
       } catch (e) {
         // ignore normalization errors
-        setNormalizedUserIngredients(new Set(uniq.map(s => s.toLowerCase())));
+        setNormalizedUserIngredients(uniq.map(s => s.toLowerCase()));
       }
     } catch (err) {
       console.error('Error fetching user ingredients:', err);
@@ -177,7 +193,7 @@ export default function RecipeDetailPage() {
 
   // When recipe or normalizedUserIngredients change, compute which recipe ingredients are owned
   useEffect(() => {
-    if (!recipe || !recipe.extendedIngredients || normalizedUserIngredients.size === 0) {
+    if (!recipe || !recipe.extendedIngredients || normalizedUserIngredients.length === 0) {
       setOwnedIngredientNames(new Set());
       setIngredientConfidences({});
       return;
@@ -234,43 +250,88 @@ export default function RecipeDetailPage() {
   const handleMarkAsCooked = async () => {
     setCooking(true);
     try {
+      if (!user) {
+        addToast('⚠️ Please log in to mark ingredients as used.', 'error', 3000);
+        setCooking(false);
+        return;
+      }
+
+      if (!recipe) {
+        addToast('❌ Recipe data missing', 'error', 3000);
+        setCooking(false);
+        return;
+      }
+
       // Get ingredients that user owns from this recipe
-      const usedIngredients = recipe?.extendedIngredients
+      const usedIngredients = recipe.extendedIngredients
         .filter((ing) => checkIngredientOwnership(ing.name))
         .map((ing) => ing.name) || [];
 
       if (usedIngredients.length === 0) {
-        alert('⚠️ No matching ingredients found in your inventory!');
+        addToast('⚠️ No matching ingredients found in your inventory!', 'error', 3000);
         setCooking(false);
         return;
       }
 
-      if (!user) {
-        alert('⚠️ Please log in to mark ingredients as used.');
-        setCooking(false);
-        return;
-      }
-
-      // Mark matching ingredients as consumed
+      // Fetch all user inventory items
       const supabase = createClient();
-      const { error } = await supabase
+      const { data: allItems, error: fetchErr } = await supabase
+        .from('inventory_items')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_consumed', false);
+
+      if (fetchErr) throw fetchErr;
+
+      // Find items that match the used ingredients
+      const itemsToConsume = (allItems || []).filter(item => {
+        const tags = Array.isArray(item.tags) ? item.tags : [];
+        const canonicalTag = tags.find((t: unknown) => typeof t === 'string' && t.startsWith('canonical:'));
+        
+        if (canonicalTag) {
+          const canonical = String(canonicalTag).replace('canonical:', '').toLowerCase();
+          return usedIngredients.some(ing => 
+            canonical.includes(ing.toLowerCase()) || ing.toLowerCase().includes(canonical)
+          );
+        }
+        
+        // Fallback to product_name matching
+        const productName = String(item.product_name || '').toLowerCase();
+        return usedIngredients.some(ing => 
+          productName.includes(ing.toLowerCase()) || ing.toLowerCase().includes(productName)
+        );
+      });
+
+      if (itemsToConsume.length === 0) {
+        addToast('⚠️ Could not find matching items in your inventory', 'error', 3000);
+        setCooking(false);
+        return;
+      }
+
+      // Mark all matching items as consumed
+      const { error: updateErr } = await supabase
         .from('inventory_items')
         .update({
           is_consumed: true,
           consumed_date: new Date().toISOString(),
         })
-        .eq('user_id', user.id)
-        .eq('is_consumed', false)
-        .filter('tags', 'cs', `{${usedIngredients.join(',')}}`);
+        .in('id', itemsToConsume.map(item => item.id));
 
-      if (error) throw error;
+      if (updateErr) throw updateErr;
 
-      alert(
-        `✅ Recipe completed! ${usedIngredients.length} ingredients marked as used.`
+      addToast(
+        `✅ Recipe completed! ${itemsToConsume.length} ingredient${itemsToConsume.length !== 1 ? 's' : ''} marked as used.`,
+        'success',
+        3000
       );
-      router.push('/dashboard');
+
+      // Redirect back to dashboard after success
+      setTimeout(() => {
+        window.history.back();
+      }, 2000);
     } catch (err) {
-      alert('❌ Error marking ingredients as used: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      addToast(`❌ Error: ${errorMsg}`, 'error', 4000);
     } finally {
       setCooking(false);
     }
@@ -331,13 +392,13 @@ export default function RecipeDetailPage() {
 
       <div className="relative z-10 container mx-auto px-4 py-8 max-w-5xl">
         {/* Back button */}
-        <Link
-          href="/dashboard"
+        <button
+          onClick={() => window.history.back()}
           className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-semibold mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
           Back to Recipes
-        </Link>
+        </button>
 
           {/* Hero section (purple theme like screenshot) */}
           <div className="rounded-3xl overflow-hidden mb-8 shadow-xl">
@@ -576,6 +637,30 @@ export default function RecipeDetailPage() {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Toast Notifications */}
+        <div className="fixed bottom-8 right-8 space-y-3 z-50">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-lg backdrop-blur-xl border animate-in fade-in slide-in-from-right-4 ${
+                toast.type === 'success'
+                  ? 'bg-emerald-500/90 border-emerald-400 text-white'
+                  : toast.type === 'error'
+                  ? 'bg-red-500/90 border-red-400 text-white'
+                  : 'bg-blue-500/90 border-blue-400 text-white'
+              }`}
+            >
+              <div className="flex-1">{toast.content}</div>
+              <button
+                onClick={() => removeToast(toast.id)}
+                className="ml-2 text-white/70 hover:text-white transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </div>

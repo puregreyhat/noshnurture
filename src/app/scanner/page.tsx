@@ -556,7 +556,7 @@ export default function ScannerPage() {
                     value={manualInput}
                     onChange={(e) => setManualInput(e.target.value)}
                     placeholder='Paste JSON data here, e.g., {"orderId":"BLK-123","orderDate":"21 Oct 2025","products":[...]}'
-                    className="w-full h-48 px-4 py-3 border-2 border-emerald-200 rounded-xl focus:outline-none focus:border-emerald-500 font-mono text-sm"
+                    className="w-full h-48 px-4 py-3 border-2 border-emerald-400 rounded-xl focus:outline-none focus:border-emerald-600 font-mono text-sm bg-white text-gray-800 placeholder-gray-500"
                   />
 
                   <button
