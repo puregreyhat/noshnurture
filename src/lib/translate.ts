@@ -1,21 +1,33 @@
-// Translation service using Google Translate API (free tier via RapidAPI)
+// Translation service - works both locally and on production
+// - Localhost: Uses Ollama (free, local)
+// - Vercel: Uses browser's native Translation API
 import { Language } from './translations';
 
-const GOOGLE_TRANSLATE_API_URL = 'https://google-translate1.p.rapidapi.com/language/translate/v2';
-
 const LANGUAGE_CODES: Record<Language, string> = {
-  'en': 'en',
-  'hi': 'hi',
-  'mr': 'mr',
-  'ta': 'ta',
-  'te': 'te',
-  'kn': 'kn',
-  'gu': 'gu',
-  'bn': 'bn',
+  'en': 'English',
+  'hi': 'Hindi',
+  'mr': 'Marathi',
+  'ta': 'Tamil',
+  'te': 'Telugu',
+  'kn': 'Kannada',
+  'gu': 'Gujarati',
+  'bn': 'Bengali',
 };
 
-// Cache translations to avoid repeated API calls
+// Cache translations
 const translationCache = new Map<string, Map<Language, string>>();
+
+// Check if browser supports native Translation API
+const supportsNativeTranslation = () => {
+  if (typeof window === 'undefined') return false;
+  return 'translation' in window;
+};
+
+// Check if in development (Ollama available)
+const isDevelopment = () => {
+  if (typeof window === 'undefined') return true;
+  return process.env.NODE_ENV === 'development';
+};
 
 export async function translateText(
   text: string,
@@ -35,52 +47,61 @@ export async function translateText(
   }
 
   try {
-    // Use browser's built-in translation or fallback to API
-    const apiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
-    
-    if (!apiKey) {
-      console.warn('Translation API key not configured, returning original text');
-      return text;
+    // Production (Vercel): Use browser's native Translation API
+    if (!isDevelopment() && supportsNativeTranslation()) {
+      try {
+        const translator = await (window as any).translation?.createTranslator({
+          sourceLanguage: 'en',
+          targetLanguage: LANGUAGE_CODES[targetLanguage],
+        });
+        if (translator) {
+          const translatedText = await translator.translate(text);
+          cacheTranslation(text, targetLanguage, translatedText);
+          return translatedText;
+        }
+      } catch (e) {
+        console.log('Browser translation unavailable');
+      }
     }
 
-    const response = await fetch(GOOGLE_TRANSLATE_API_URL, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-        'X-RapidAPI-Key': apiKey,
-        'X-RapidAPI-Host': 'google-translate1.p.rapidapi.com',
-      },
-      body: new URLSearchParams({
-        q: text,
-        target: LANGUAGE_CODES[targetLanguage],
-        source: 'en',
-      }).toString(),
-    });
+    // Development (localhost): Use Ollama
+    if (isDevelopment()) {
+      try {
+        const ollamaUrl = process.env.NEXT_PUBLIC_OLLAMA_URL || 'http://localhost:11434';
+        const response = await fetch(`${ollamaUrl}/api/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'mistral',
+            prompt: `Translate to ${LANGUAGE_CODES[targetLanguage]}: "${text}"\n\nTranslation:`,
+            stream: false,
+            temperature: 0.3,
+          }),
+        });
 
-    if (!response.ok) {
-      console.error('Translation API error:', response.status);
-      return text;
+        if (response.ok) {
+          const data = await response.json() as { response?: string };
+          const translatedText = data.response?.trim() || text;
+          cacheTranslation(text, targetLanguage, translatedText);
+          return translatedText;
+        }
+      } catch (error) {
+        console.warn('Ollama unavailable, returning original text');
+      }
     }
 
-    const data = await response.json() as {
-      data?: {
-        translations?: Array<{ translatedText: string }>;
-      };
-    };
-
-    const translatedText = data.data?.translations?.[0]?.translatedText || text;
-
-    // Cache the translation
-    if (!translationCache.has(text)) {
-      translationCache.set(text, new Map());
-    }
-    translationCache.get(text)!.set(targetLanguage, translatedText);
-
-    return translatedText;
+    return text;
   } catch (error) {
-    console.error('Translation error:', error);
-    return text; // Return original text on error
+    console.warn('Translation error:', error);
+    return text;
   }
+}
+
+function cacheTranslation(text: string, targetLanguage: Language, translatedText: string) {
+  if (!translationCache.has(text)) {
+    translationCache.set(text, new Map());
+  }
+  translationCache.get(text)!.set(targetLanguage, translatedText);
 }
 
 export async function translateRecipeInstructions(
