@@ -11,6 +11,7 @@ import {
   Globe2,
 } from "lucide-react";
 import WelcomeSection from "./Welcome";
+import { ExpiryAlert } from "@/components/ExpiryAlert";
 import { createClient } from "@/lib/supabase/client";
 import { getSettings } from "@/lib/settings";
 import { isLocalModelAvailable, generateLocalRecipe } from "@/lib/recipes/localRnn";
@@ -23,13 +24,15 @@ export default function FoodDashboard() {
   const [consumedItems30d, setConsumedItems30d] = useState<InventoryItemDB[]>([]);
   const [loading, setLoading] = useState(true);
   const [recipeLoading, setRecipeLoading] = useState(false);
-  const [suggestions, setSuggestions] = useState<Array<{ 
+    const [suggestions, setSuggestions] = useState<Array<{ 
     title: string; 
     image?: string; 
     source?: string;
     id?: number | string;
     readyInMinutes?: number;
     servings?: number;
+    cuisine?: string;
+    ingredients?: { name: string; amount?: string }[];
   }>>([]);
 
   const [localAIReady, setLocalAIReady] = useState<boolean>(false);
@@ -47,8 +50,29 @@ export default function FoodDashboard() {
   const [estimatedMealsPerWeek, setEstimatedMealsPerWeek] = useState<number>(0);
   const [selectedCuisines, setSelectedCuisines] = useState<Set<string>>(new Set());
   const [availableCuisines, setAvailableCuisines] = useState<string[]>([]);
+  const [cuisineDropdownOpen, setCuisineDropdownOpen] = useState<boolean>(false);
+  const [cuisineSearchQuery, setCuisineSearchQuery] = useState<string>("");
   const [recipeSearchQuery, setRecipeSearchQuery] = useState<string>("");
   const [recipePageIndex, setRecipePageIndex] = useState<number>(0);
+
+  const [previousUser, setPreviousUser] = useState(user);
+
+  // Ensure expiry alert will show on login by clearing any session dismissal flag
+  // Only clear when user actually logs in, not on every dashboard navigation
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        // Only clear dismissal flag when user logs in (transitions from no user to having a user)
+        const isNewLogin = !previousUser && user;
+        if (isNewLogin) {
+          sessionStorage.removeItem("expiryAlertDismissed");
+        }
+        setPreviousUser(user);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [user, previousUser]);
 
   // Fetch inventory from Supabase and recently consumed items (for waste calculations)
   useEffect(() => {
@@ -136,8 +160,8 @@ export default function FoodDashboard() {
   // Extract unique cuisines from suggestions dynamically
   useEffect(() => {
     const cuisines = suggestions
-      .map((recipe: any) => recipe.cuisine)
-      .filter((cuisine: any) => cuisine && typeof cuisine === 'string')
+      .map((recipe) => recipe.cuisine)
+      .filter((cuisine): cuisine is string => cuisine !== undefined && typeof cuisine === 'string')
       .filter((value: string, index: number, self: string[]) => self.indexOf(value) === index)
       .sort();
     
@@ -194,7 +218,7 @@ export default function FoodDashboard() {
     unit: (it.unit ?? '') as string,
     expiry: typeof it.days_until_expiry === 'number' ? `${String(it.days_until_expiry)} days` : 'Unknown',
     action: typeof it.days_until_expiry === 'number' && it.days_until_expiry <= 3 ? 'Use soon' : 'Plan',
-    tags: (it as any).tags || [],
+    tags: it.tags || [],
   }));
 
   const summary = {
@@ -203,9 +227,17 @@ export default function FoodDashboard() {
     wasteReduced: wasteReducedKg !== null ? Math.round(wasteReducedKg) : 0,
   };
 
+  // Filter cuisines based on search query
+  const filteredCuisines = availableCuisines.filter((cuisine) =>
+    cuisine.toLowerCase().includes(cuisineSearchQuery.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen font-['Poppins'] bg-gradient-to-br from-emerald-50 via-white to-green-100">
       <WelcomeSection />
+
+  {/* Expiry alert popup (shows when there are items expiring within 1-2 days) */}
+  <ExpiryAlert items={inventoryItems} />
 
       <div id="content-section" className="p-8 max-w-6xl mx-auto relative z-0">
         {/* Summary Cards */}
@@ -300,12 +332,12 @@ export default function FoodDashboard() {
 
         {/* Recipes Section (restored) */}
         <Section title="Recipe Suggestions" icon={<Utensils className="text-orange-500" />}>
-          <div className="p-4">
+          <div id="recipe-suggestions" className="p-4">
             {/* Search Bar */}
             <div className="mb-4">
               <input
                 type="text"
-                placeholder="Search recipes by name... (e.g., burger, pizza)"
+                placeholder="Search recipes by name... (e.g., burger, pizza) or ingredients (e.g., eggs,bread,salt)"
                 value={recipeSearchQuery}
                 onChange={(e) => {
                   setRecipeSearchQuery(e.target.value);
@@ -316,43 +348,94 @@ export default function FoodDashboard() {
             </div>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
-              {/* Cuisine Filter */}
-              <div className="flex flex-wrap gap-2">
-                {availableCuisines.length > 0 ? (
-                  availableCuisines.map((cuisine) => (
-                    <button
-                      key={cuisine}
-                      onClick={() => {
-                        const newSet = new Set(selectedCuisines);
-                        if (newSet.has(cuisine)) {
-                          newSet.delete(cuisine);
-                        } else {
-                          newSet.add(cuisine);
-                        }
-                        setSelectedCuisines(newSet);
-                        setRecipePageIndex(0); // Reset to first page on filter change
-                      }}
-                      className={`text-xs px-3 py-1.5 rounded-full font-medium transition-all ${
-                        selectedCuisines.has(cuisine)
-                          ? 'bg-orange-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-700 border border-gray-200 hover:border-orange-300'
-                      }`}
-                    >
-                      {cuisine}
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-xs text-gray-500 italic">Loading cuisines...</p>
+              {/* Cuisine Filter Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setCuisineDropdownOpen(!cuisineDropdownOpen)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg shadow-sm hover:shadow-md transition-all text-sm font-medium text-gray-700"
+                >
+                  <span>
+                    {selectedCuisines.size === 0
+                      ? 'Filter by Cuisine'
+                      : `${selectedCuisines.size} cuisine${selectedCuisines.size > 1 ? 's' : ''} selected`}
+                  </span>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${cuisineDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {cuisineDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-80 bg-white border border-gray-300 rounded-lg shadow-lg z-50 max-h-96 overflow-hidden">
+                    {/* Search Bar */}
+                    <div className="p-3 border-b border-gray-200">
+                      <input
+                        type="text"
+                        placeholder="Search cuisines..."
+                        value={cuisineSearchQuery}
+                        onChange={(e) => setCuisineSearchQuery(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                    </div>
+
+                    {/* Checkboxes */}
+                    <div className="max-h-64 overflow-y-auto">
+                      {filteredCuisines.length > 0 ? (
+                        filteredCuisines.map((cuisine) => (
+                          <label
+                            key={cuisine}
+                            className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedCuisines.has(cuisine)}
+                              onChange={() => {
+                                const newSet = new Set(selectedCuisines);
+                                if (newSet.has(cuisine)) {
+                                  newSet.delete(cuisine);
+                                } else {
+                                  newSet.add(cuisine);
+                                }
+                                setSelectedCuisines(newSet);
+                                setRecipePageIndex(0); // Reset to first page on filter change
+                              }}
+                              className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500 focus:ring-2"
+                            />
+                            <span className="text-sm text-gray-700">{cuisine}</span>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="px-3 py-4 text-sm text-gray-500 text-center">
+                          No cuisines found
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="border-t border-gray-200 p-3 flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedCuisines(new Set());
+                          setRecipePageIndex(0);
+                        }}
+                        className="flex-1 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                      >
+                        Clear All
+                      </button>
+                      <button
+                        onClick={() => setCuisineDropdownOpen(false)}
+                        className="flex-1 px-3 py-1.5 text-sm bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
-
-              <button
-                className="text-sm px-3 py-1 rounded-full bg-white/90 text-gray-800 border shadow-sm hover:shadow-md whitespace-nowrap"
-                onClick={() => setShowOnlySugran((v) => !v)}
-                aria-pressed={!showOnlySugran}
-              >
-                {showOnlySugran ? 'Showing Sugran recipes only · Show all' : 'Showing all recipes · Show Sugran only'}
-              </button>
             </div>
 
             {recipeLoading ? (
@@ -381,8 +464,43 @@ export default function FoodDashboard() {
                 .filter((s) => {
                   // Filter by search query
                   if (!recipeSearchQuery.trim()) return true;
-                  const title = String(s.title || '').toLowerCase();
-                  return title.includes(recipeSearchQuery.toLowerCase());
+
+                  const query = recipeSearchQuery.trim().toLowerCase();
+
+                  // Check if query contains commas (indicating explicit ingredient search)
+                  if (query.includes(',')) {
+                    // Ingredient search: split by commas and check if recipe contains these ingredients
+                    const searchIngredients = query.split(',')
+                      .map(ing => ing.trim())
+                      .filter(ing => ing.length > 0);
+
+                    if (searchIngredients.length === 0) return true;
+
+                    // Get recipe ingredients (handle both array and other formats)
+                    const recipeIngredients = s.ingredients;
+                    if (!Array.isArray(recipeIngredients)) return false;
+
+                    // Check if recipe contains ALL searched ingredients
+                    return searchIngredients.every(searchIng =>
+                      recipeIngredients.some((recipeIng) =>
+                        recipeIng.name && recipeIng.name.toLowerCase().includes(searchIng)
+                      )
+                    );
+                  } else {
+                    // Search both title AND ingredients (without commas)
+                    const title = String(s.title || '').toLowerCase();
+                    const titleMatch = title.includes(query);
+
+                    // Also check ingredients
+                    const recipeIngredients = s.ingredients;
+                    const ingredientMatch = Array.isArray(recipeIngredients) &&
+                      recipeIngredients.some((recipeIng) =>
+                        recipeIng.name && recipeIng.name.toLowerCase().includes(query)
+                      );
+
+                    // Return true if either title or ingredients match
+                    return titleMatch || ingredientMatch;
+                  }
                 });
 
               const itemsPerPage = 6;

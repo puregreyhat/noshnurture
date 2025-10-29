@@ -179,6 +179,18 @@ export async function GET(request: Request) {
               source: 'sugran',
               matched: matchedIngredients,
               missing: missingIngredients,
+              ingredients: ingredients.map((ing: unknown) => {
+                if (typeof ing === 'string') {
+                  return { name: ing.trim(), amount: '' };
+                } else if (typeof ing === 'object' && ing !== null) {
+                  const ingObj = ing as Record<string, unknown>;
+                  return {
+                    name: String(ingObj.name || '').trim(),
+                    amount: String(ingObj.amount || ingObj.quantity || '').trim()
+                  };
+                }
+                return { name: '', amount: '' };
+              }).filter(ing => ing.name),
               cuisine,
               matchedIngredientCount: matchedCount,
               totalIngredientCount: totalCount,

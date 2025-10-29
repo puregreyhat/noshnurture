@@ -5,6 +5,7 @@ import { Package, Search, Filter, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import type { InventoryItemDB } from "@/lib/supabase-types";
 import { useAuth } from "@/contexts/AuthContext";
+import { ExpiryAlert } from "@/components/ExpiryAlert";
 
 export default function InventoryPage() {
   const { user } = useAuth();
@@ -126,12 +127,12 @@ export default function InventoryPage() {
             </div>
 
             {/* Filter */}
-            <div className="relative">
-              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <div className="relative flex-shrink-0">
+              <Filter className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-600 pointer-events-none" />
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="pl-12 pr-8 py-3 rounded-2xl border-2 border-gray-200 focus:border-emerald-500 focus:outline-none appearance-none bg-white cursor-pointer transition-all"
+                className="pl-12 pr-4 py-3 rounded-2xl border-2 border-emerald-300 focus:border-emerald-500 focus:outline-none appearance-none bg-white text-gray-800 cursor-pointer transition-all font-medium min-w-[160px] hover:border-emerald-400"
               >
                 <option value="all">All Items</option>
                 <option value="fresh">Fresh</option>
@@ -139,6 +140,12 @@ export default function InventoryPage() {
                 <option value="warning">Warning</option>
                 <option value="expired">Expired</option>
               </select>
+              {/* Custom dropdown arrow */}
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </div>
             </div>
           </div>
 
