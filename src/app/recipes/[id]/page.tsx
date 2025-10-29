@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  Globe,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { normalizeIngredientName, normalizeIngredientNameWithScore, levenshtein } from '@/lib/ingredients/normalize';
@@ -87,6 +88,77 @@ export default function RecipePage() {
   const [toasts, setToasts] = useState<Array<{ id: number; content: React.ReactNode; type: 'success' | 'error' | 'info' }>>([]);
   const [translatedSteps, setTranslatedSteps] = useState<{ [key: number]: string }>({});
   const [translatingSteps, setTranslatingSteps] = useState(false);
+
+  // Function to trigger translation with full fallback chain
+  // Uses: Sarvam AI → Browser API → LibreTranslate → Ollama → English
+  const handleTranslatePage = async () => {
+    if (typeof window === 'undefined') return;
+    
+    if (language === 'en') {
+      addToast('ℹ️ Already in English', 'info');
+      return;
+    }
+
+    try {
+      setTranslatingSteps(true);
+      addToast('⏳ Translating recipe instructions...', 'info');
+      
+      // Get all instruction text
+      const instructionTexts = recipe?.analyzedInstructions[0]?.steps.map(s => s.step) || [];
+      
+      if (instructionTexts.length === 0) {
+        addToast('⚠️ No recipe instructions found', 'error');
+        setTranslatingSteps(false);
+        return;
+      }
+      
+      console.log(`Starting translation of ${instructionTexts.length} steps to ${language}`);
+      
+      // Import our translation service with full fallback chain
+      const { translateText } = await import('@/lib/translate');
+      
+      // Translate each step using our service
+      // Priority: Sarvam AI → Browser API → LibreTranslate → Ollama → English
+      const translated: Record<number, string> = {};
+      let successCount = 0;
+      
+      for (let i = 0; i < instructionTexts.length; i++) {
+        try {
+          const step = instructionTexts[i];
+          console.log(`Translating step ${i + 1}: "${step.substring(0, 50)}..."`);
+          
+          const translatedStep = await translateText(step, language as any);
+          
+          if (translatedStep && translatedStep !== step) {
+            translated[i + 1] = translatedStep;
+            successCount++;
+            console.log(`✓ Step ${i + 1} translated successfully`);
+          } else {
+            translated[i + 1] = step;
+            console.warn(`⚠️ Step ${i + 1} returned empty or same text`);
+          }
+        } catch (e) {
+          console.error(`❌ Failed to translate step ${i + 1}:`, e);
+          translated[i + 1] = instructionTexts[i];
+        }
+      }
+      
+      setTranslatedSteps(translated);
+      setTranslatingSteps(false);
+      
+      if (successCount === instructionTexts.length) {
+        addToast('✅ Recipe instructions translated!', 'success');
+      } else if (successCount > 0) {
+        addToast(`⚠️ Partially translated (${successCount}/${instructionTexts.length} steps)`, 'info');
+      } else {
+        addToast('❌ Translation failed. Check browser console for details.', 'error');
+      }
+    } catch (error) {
+      setTranslatingSteps(false);
+      console.error('Translation error:', error);
+      addToast('❌ Translation failed. Using English fallback.', 'error');
+    }
+  };
 
   function addToast(content: React.ReactNode, type: 'success' | 'error' | 'info' = 'info', timeout = 3000) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -595,7 +667,19 @@ export default function RecipePage() {
           {/* Instructions & Nutrition (right) */}
           <div className="md:col-span-2 space-y-8">
             <div className="bg-white rounded-3xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">{getTranslation('recipe.instructions', language)}</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">{getTranslation('recipe.instructions', language)}</h2>
+                {language !== 'en' && (
+                  <button
+                    onClick={handleTranslatePage}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
+                    title="Translate instructions to current language"
+                  >
+                    <Globe className="w-4 h-4" />
+                    Translate
+                  </button>
+                )}
+              </div>
               {recipe.analyzedInstructions.length > 0 ? (
                 <ol className="space-y-6">
                   {recipe.analyzedInstructions[0].steps.map((step) => (

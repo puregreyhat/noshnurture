@@ -1,6 +1,6 @@
 // Translation service - works both locally and on production
 // - Localhost: Uses Ollama (free, local)
-// - Vercel: Uses browser's native Translation API
+// - Production: Uses Sarvam AI (best for Indian languages) → LibreTranslate (fallback)
 import { Language } from './translations';
 
 const LANGUAGE_CODES: Record<Language, string> = {
@@ -12,6 +12,31 @@ const LANGUAGE_CODES: Record<Language, string> = {
   'kn': 'Kannada',
   'gu': 'Gujarati',
   'bn': 'Bengali',
+};
+
+// Sarvam AI language codes (optimized for Indian languages)
+const SARVAM_LANGUAGE_CODES: Record<Language, string> = {
+  'en': 'en-IN',
+  'hi': 'hi-IN',
+  'mr': 'mr-IN',
+  'ta': 'ta-IN',
+  'te': 'te-IN',
+  'kn': 'kn-IN',
+  'gu': 'gu-IN',
+  'bn': 'bn-IN',
+};
+
+// LibreTranslate language codes
+// Supports 30+ languages including all Indian languages
+const LIBRETRANSLATE_CODES: Record<Language, string> = {
+  'en': 'en',
+  'hi': 'hi',
+  'mr': 'mr',
+  'ta': 'ta',
+  'te': 'te',
+  'kn': 'kn',
+  'gu': 'gu',
+  'bn': 'bn',
 };
 
 // Cache translations
@@ -28,6 +53,85 @@ const isDevelopment = () => {
   if (typeof window === 'undefined') return true;
   return process.env.NODE_ENV === 'development';
 };
+
+// Use Sarvam AI for translation (best for Indian languages)
+async function translateWithSarvamAI(
+  text: string,
+  targetLanguage: Language,
+): Promise<string> {
+  try {
+    const apiKey = process.env.NEXT_PUBLIC_SARVAM_API_KEY;
+    if (!apiKey) {
+      console.warn('Sarvam AI API key not configured');
+      return text;
+    }
+
+    const response = await fetch('https://api.sarvam.ai/text/translate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        input: text,
+        source_language_code: 'en-IN',
+        target_language_code: SARVAM_LANGUAGE_CODES[targetLanguage],
+        mode: 'formal',
+        model: 'sarvam-translate:v1',
+        numerals_format: 'native',
+        speaker_gender: 'Male',
+        enable_preprocessing: false,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Sarvam AI error:', response.status, errorText);
+      throw new Error(`Sarvam AI HTTP ${response.status}: ${errorText}`);
+    }
+
+    const data = await response.json() as { translated_text?: string };
+    if (!data.translated_text) {
+      console.error('Sarvam AI returned empty translation:', data);
+      throw new Error('Sarvam AI returned empty translation');
+    }
+    console.log('✓ Sarvam AI translation successful');
+    return data.translated_text;
+  } catch (error) {
+    console.warn('Sarvam AI translation failed, will try fallback:', error);
+    throw error; // Throw error to trigger fallback chain
+  }
+}
+
+// Use LibreTranslate API (free, public instance)
+async function translateWithLibreTranslate(
+  text: string,
+  targetLanguage: Language,
+): Promise<string> {
+  try {
+    // Using libre.io public instance (free, no API key needed)
+    const response = await fetch('https://api.libretranslate.de/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: text,
+        source: 'en',
+        target: LIBRETRANSLATE_CODES[targetLanguage],
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn('LibreTranslate API error:', response.status);
+      return text;
+    }
+
+    const data = await response.json() as { translatedText?: string };
+    return data.translatedText || text;
+  } catch (error) {
+    console.warn('LibreTranslate translation failed:', error);
+    return text;
+  }
+}
 
 export async function translateText(
   text: string,
@@ -47,26 +151,43 @@ export async function translateText(
   }
 
   try {
-    // Production (Vercel): Use browser's native Translation API
-    if (!isDevelopment() && supportsNativeTranslation()) {
+    // Try Sarvam AI FIRST (production AND development)
+    // It's the best quality for Indian languages
+    try {
+      console.log('🔄 Trying Sarvam AI for', targetLanguage);
+      const sarvamTranslation = await translateWithSarvamAI(text, targetLanguage);
+      if (sarvamTranslation && sarvamTranslation !== text) {
+        console.log('✅ Sarvam AI successful');
+        cacheTranslation(text, targetLanguage, sarvamTranslation);
+        return sarvamTranslation;
+      }
+    } catch (e) {
+      console.log('❌ Sarvam AI failed:', e);
+    }
+
+    // Try browser's native Translation API
+    if (supportsNativeTranslation()) {
       try {
+        console.log('🔄 Trying Browser Translation API');
         const translator = await (window as any).translation?.createTranslator({
           sourceLanguage: 'en',
-          targetLanguage: LANGUAGE_CODES[targetLanguage],
+          targetLanguage: LIBRETRANSLATE_CODES[targetLanguage],
         });
         if (translator) {
           const translatedText = await translator.translate(text);
+          console.log('✅ Browser API successful');
           cacheTranslation(text, targetLanguage, translatedText);
           return translatedText;
         }
       } catch (e) {
-        console.log('Browser translation unavailable');
+        console.log('❌ Browser API failed:', e);
       }
     }
 
-    // Development (localhost): Use Ollama
+    // Development (localhost): Use Ollama as second priority
     if (isDevelopment()) {
       try {
+        console.log('🔄 Trying Ollama (development)');
         const ollamaUrl = process.env.NEXT_PUBLIC_OLLAMA_URL || 'http://localhost:11434';
         const response = await fetch(`${ollamaUrl}/api/generate`, {
           method: 'POST',
@@ -82,14 +203,27 @@ export async function translateText(
         if (response.ok) {
           const data = await response.json() as { response?: string };
           const translatedText = data.response?.trim() || text;
-          cacheTranslation(text, targetLanguage, translatedText);
-          return translatedText;
+          if (translatedText && translatedText !== text) {
+            console.log('✅ Ollama successful');
+            cacheTranslation(text, targetLanguage, translatedText);
+            return translatedText;
+          }
         }
       } catch (error) {
-        console.warn('Ollama unavailable, returning original text');
+        console.warn('❌ Ollama failed:', error);
       }
     }
 
+    // Fallback: Use LibreTranslate API
+    console.log('🔄 Trying LibreTranslate (fallback)');
+    const libreTranslation = await translateWithLibreTranslate(text, targetLanguage);
+    if (libreTranslation && libreTranslation !== text) {
+      console.log('✅ LibreTranslate successful');
+      cacheTranslation(text, targetLanguage, libreTranslation);
+      return libreTranslation;
+    }
+
+    console.warn('⚠️ All translation services failed, using English');
     return text;
   } catch (error) {
     console.warn('Translation error:', error);
