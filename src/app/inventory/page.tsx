@@ -198,9 +198,15 @@ export default function InventoryPage() {
               return (
                 <motion.div
                   key={item.id || idx}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3, delay: idx * 0.02 }}
+                  initial={{ opacity: 0, scale: 0.85, rotateY: 90 }}
+                  animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                  whileHover={{ scale: 1.05, translateY: -8, rotateZ: 1 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ 
+                    duration: 0.4, 
+                    delay: idx * 0.05,
+                    ease: [0.34, 1.56, 0.64, 1]
+                  }}
                   className={`relative rounded-2xl border-2 ${config.border} ${config.bg} p-5 shadow-lg hover:shadow-2xl transition-all group`}
                 >
                   {/* Status Badge */}

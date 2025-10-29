@@ -537,12 +537,9 @@ export default function FoodDashboard() {
                           <h4 className="font-semibold text-sm drop-shadow-md leading-tight">{s.title}</h4>
                           {(() => {
                             const sObj = s as unknown as Record<string, unknown>;
-                            const source = String(sObj.source || '');
                             const cuisine = String(sObj.cuisine || '');
                             return (
                               <p className="text-xs opacity-90 mt-0.5">
-                                {source && `Source: ${source}`}
-                                {source && cuisine && ' · '}
                                 {cuisine && `${cuisine}`}
                               </p>
                             );
@@ -735,24 +732,45 @@ function SummaryCard({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ scale: 1.07, rotate: 0.5 }}
-      transition={{ duration: 0.6, delay: idx * 0.1 }}
-      className={`rounded-2xl p-6 text-white shadow-xl bg-gradient-to-r ${gradient} relative overflow-hidden`}
+      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      whileHover={{ scale: 1.08, rotate: 0.5, translateY: -5 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ 
+        duration: 0.5, 
+        delay: (idx || 0) * 0.12,
+        ease: [0.34, 1.56, 0.64, 1] // Spring-like easing
+      }}
+      className={`rounded-2xl p-6 text-white shadow-xl bg-gradient-to-r ${gradient} relative overflow-hidden group`}
     >
-      <div className="flex justify-between items-start mb-4">
-        <div className="text-4xl p-2 bg-white/20 rounded-lg backdrop-blur-sm">{icon}</div>
+      {/* Animated background shine effect */}
+      <div className="absolute inset-0 bg-white/0 group-hover:bg-white/10 transition-all duration-300" />
+      
+      <div className="flex justify-between items-start mb-4 relative z-10">
+        <motion.div 
+          className="text-4xl p-2 bg-white/20 rounded-lg backdrop-blur-sm"
+          whileHover={{ rotate: 12 }}
+          transition={{ type: "spring", stiffness: 400 }}
+        >
+          {icon}
+        </motion.div>
         {blink && (
           <motion.span
-            animate={{ opacity: [1, 0.2, 1] }}
+            animate={{ opacity: [1, 0.2, 1], scale: [1, 1.2, 1] }}
             transition={{ duration: 1.2, repeat: Infinity }}
-            className="h-3 w-3 rounded-full bg-white shadow-sm"
+            className="h-3 w-3 rounded-full bg-white shadow-lg"
           ></motion.span>
         )}
       </div>
-      <h3 className="text-sm font-medium opacity-95">{title}</h3>
-      <p className="text-4xl font-extrabold mt-2 drop-shadow-lg">{value}</p>
+      <h3 className="text-sm font-medium opacity-95 relative z-10">{title}</h3>
+      <motion.p 
+        className="text-4xl font-extrabold mt-2 drop-shadow-lg relative z-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: (idx || 0) * 0.12 + 0.3, duration: 0.5 }}
+      >
+        {value}
+      </motion.p>
     </motion.div>
   );
 }

@@ -515,7 +515,7 @@ export default function RecipePage() {
         <div className="absolute -bottom-8 left-1/2 w-72 h-72 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
       </div>
 
-      <div className="relative z-10 container mx-auto px-4 py-8 max-w-5xl">
+      <div className="relative z-10 container mx-auto px-4 py-8 pb-32 max-w-5xl">
         {/* Top controls */}
         <div className="flex items-center justify-between mb-6">
           <button
