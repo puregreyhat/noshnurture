@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
   ArrowLeft,
   Clock,
@@ -13,13 +14,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
-  Globe,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { normalizeIngredientName, normalizeIngredientNameWithScore, levenshtein } from '@/lib/ingredients/normalize';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguagePreference } from '@/hooks/useLanguagePreference';
-import { LanguageSelector } from '@/components/LanguageSelector';
 import { getTranslation } from '@/lib/translations';
 import { translateIngredient } from '@/lib/ingredientTranslations';
 import { translateRecipeStep } from '@/lib/translate';
@@ -72,13 +71,17 @@ interface RecipeDetail {
 
 export default function RecipePage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const { language, updateLanguage, isLoaded } = useLanguagePreference();
 
   const recipeId = params.id as string;
+  const recipeTitle = searchParams.get('title') || 'Recipe';
+  const recipeImage = searchParams.get('image') || '';
 
   const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showLoadingAnimation, setShowLoadingAnimation] = useState(true);
   const [cooking, setCooking] = useState(false);
   const [error, setError] = useState('');
   const [userIngredients, setUserIngredients] = useState<string[]>([]);
@@ -452,12 +455,130 @@ export default function RecipePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-green-100 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-emerald-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading delicious recipe...</p>
-        </div>
-      </div>
+      <motion.div 
+        className="fixed inset-0 bg-gradient-to-br from-emerald-50 via-white to-green-100 flex items-center justify-center z-50"
+        animate={{ opacity: showLoadingAnimation ? 1 : 0 }}
+        transition={{ duration: 0.8, ease: "easeInOut" }}
+        onAnimationComplete={() => {
+          if (!showLoadingAnimation) {
+            // Animation complete, allow page to render
+          }
+        }}
+      >
+        {showLoadingAnimation && (
+          <>
+            {/* Dramatic backdrop blur and fade */}
+            <motion.div
+              className="absolute inset-0 bg-black/20 backdrop-blur-md"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+            />
+
+            {/* Animated recipe card that enlarges */}
+            <motion.div
+              className="relative z-10 w-80 h-96 bg-white rounded-3xl shadow-2xl overflow-hidden"
+              initial={{ 
+                scale: 0.8, 
+                opacity: 0,
+                y: 100
+              }}
+              animate={{ 
+                scale: 1, 
+                opacity: 1,
+                y: 0
+              }}
+              transition={{ 
+                duration: 0.6, 
+                type: "spring", 
+                stiffness: 300, 
+                damping: 30 
+              }}
+              onAnimationComplete={() => {
+                // Wait a moment then enlarge dramatically
+                setTimeout(() => {
+                  setShowLoadingAnimation(false);
+                }, 800);
+              }}
+            >
+              {/* Card image - actual recipe image or placeholder */}
+              <motion.div
+                className="w-full h-full relative overflow-hidden"
+                animate={{ scale: showLoadingAnimation ? 1 : 20, opacity: showLoadingAnimation ? 1 : 0 }}
+                transition={{ duration: 1.2, ease: "easeInOut" }}
+              >
+                {recipeImage ? (
+                  <>
+                    {/* Recipe image background */}
+                    <img
+                      src={recipeImage}
+                      alt={recipeTitle}
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Dark overlay for readability */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+                  </>
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-purple-400 to-violet-500" />
+                )}
+
+                {/* Shimmer effect */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                  animate={{ x: ['-100%', '100%'] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                />
+
+                {/* Loading content overlay - appears on top */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
+                  {/* Recipe title */}
+                  <h3 className="text-white font-bold text-xl text-center px-4 mb-4 drop-shadow-lg">
+                    {recipeTitle}
+                  </h3>
+
+                  {/* Loading spinner */}
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Loader2 className="w-12 h-12 text-white/90" />
+                  </motion.div>
+                  <p className="text-white/80 font-semibold text-sm mt-3 drop-shadow-md">Preparing...</p>
+                </div>
+              </motion.div>
+            </motion.div>
+
+            {/* Particle effects around card */}
+            {[...Array(6)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-2 h-2 bg-emerald-500 rounded-full"
+                initial={{
+                  x: 0,
+                  y: 0,
+                  opacity: 1,
+                }}
+                animate={{
+                  x: Math.cos((i / 6) * Math.PI * 2) * 200,
+                  y: Math.sin((i / 6) * Math.PI * 2) * 200,
+                  opacity: 0,
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  delay: i * 0.1,
+                }}
+                style={{
+                  left: '50%',
+                  top: '50%',
+                  marginLeft: '-4px',
+                  marginTop: '-4px',
+                }}
+              />
+            ))}
+          </>
+        )}
+      </motion.div>
     );
   }
 
@@ -525,7 +646,6 @@ export default function RecipePage() {
             <ArrowLeft className="w-5 h-5" />
             {getTranslation('recipe.back', language)}
           </button>
-          <LanguageSelector currentLanguage={language} onLanguageChange={updateLanguage} />
         </div>
 
           {/* Hero section (purple theme like screenshot) */}
@@ -565,7 +685,7 @@ export default function RecipePage() {
           </div>
 
           {/* Tags */}
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-6">
             <div className="flex flex-wrap gap-2">
               {recipe.cuisines.map((cuisine) => (
                 <span
@@ -667,19 +787,7 @@ export default function RecipePage() {
           {/* Instructions & Nutrition (right) */}
           <div className="md:col-span-2 space-y-8">
             <div className="bg-white rounded-3xl shadow-xl p-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">{getTranslation('recipe.instructions', language)}</h2>
-                {language !== 'en' && (
-                  <button
-                    onClick={handleTranslatePage}
-                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-medium"
-                    title="Translate instructions to current language"
-                  >
-                    <Globe className="w-4 h-4" />
-                    Translate
-                  </button>
-                )}
-              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">{getTranslation('recipe.instructions', language)}</h2>
               {recipe.analyzedInstructions.length > 0 ? (
                 <ol className="space-y-6">
                   {recipe.analyzedInstructions[0].steps.map((step) => (

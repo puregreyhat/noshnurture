@@ -581,7 +581,7 @@ export default function FoodDashboard() {
                       {/* View button (top-right) */}
                       {s.id ? (
                         <Link
-                          href={`/recipes/${encodeURIComponent(String(s.id))}`}
+                          href={`/recipes/${encodeURIComponent(String(s.id))}?title=${encodeURIComponent(String(s.title))}&image=${encodeURIComponent(String(s.image || ''))}`}
                           aria-label={`View ${String(s.title)}`}
                           className="absolute right-3 top-3 inline-flex items-center gap-2 px-3 py-1.5 bg-white/95 text-gray-800 text-sm font-medium rounded-full shadow-lg hover:bg-white/100 hover:scale-105 transition-transform"
                         >
