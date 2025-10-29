@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
   Clock,
   Users,
   Heart,
-  ChefHat,
   Leaf,
   Flame,
   CheckCircle2,
@@ -18,6 +17,11 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { normalizeIngredientName, normalizeIngredientNameWithScore, levenshtein } from '@/lib/ingredients/normalize';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguagePreference } from '@/hooks/useLanguagePreference';
+import { LanguageSelector } from '@/components/LanguageSelector';
+import { getTranslation } from '@/lib/translations';
+import { translateIngredient } from '@/lib/ingredientTranslations';
+import { translateRecipeStep } from '@/lib/translate';
 
 interface RecipeDetail {
   id: number;
@@ -67,8 +71,8 @@ interface RecipeDetail {
 
 export default function RecipePage() {
   const params = useParams();
-  const router = useRouter();
   const { user } = useAuth();
+  const { language, updateLanguage, isLoaded } = useLanguagePreference();
 
   const recipeId = params.id as string;
 
@@ -81,6 +85,8 @@ export default function RecipePage() {
   const [ownedIngredientNames, setOwnedIngredientNames] = useState(new Set<string>());
   const [ingredientConfidences, setIngredientConfidences] = useState<{ [key: string]: 'high' | 'medium' | 'low' }>({});
   const [toasts, setToasts] = useState<Array<{ id: number; content: React.ReactNode; type: 'success' | 'error' | 'info' }>>([]);
+  const [translatedSteps, setTranslatedSteps] = useState<{ [key: number]: string }>({});
+  const [translatingSteps, setTranslatingSteps] = useState(false);
 
   function addToast(content: React.ReactNode, type: 'success' | 'error' | 'info' = 'info', timeout = 3000) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -124,7 +130,8 @@ export default function RecipePage() {
       const supabase = createClient();
       const { data, error } = await supabase
         .from('inventory_items')
-        .select('tags')
+        // fetch tags and product_name so we can normalize product names when tags don't contain canonical values
+        .select('tags, product_name')
         .eq('user_id', user.id)
         .eq('is_consumed', false);
 
@@ -154,20 +161,22 @@ export default function RecipePage() {
       setUserIngredients(uniq);
 
       // Normalize user ingredients to canonical forms for better matching
+      // This ensures product names like "Aashirvaad Salt" are normalized to "salt"
       try {
         const norms = new Set<string>();
         await Promise.all(uniq.map(async (ing) => {
           try {
+            // Normalize each ingredient (both tags and product names)
             const n = await normalizeIngredientName(ing, { prefer: 'fuzzy' });
-            norms.add(n.toLowerCase());
+            norms.add(n.toLowerCase().trim());
           } catch {
-            norms.add(ing.toLowerCase());
+            norms.add(ing.toLowerCase().trim());
           }
         }));
         setNormalizedUserIngredients(Array.from(norms));
       } catch (e) {
         // ignore normalization errors
-        setNormalizedUserIngredients(uniq.map(s => s.toLowerCase()));
+        setNormalizedUserIngredients(uniq.map(s => s.toLowerCase().trim()));
       }
     } catch (err) {
       console.error('Error fetching user ingredients:', err);
@@ -212,7 +221,7 @@ export default function RecipePage() {
           let bestDist = Infinity;
           let bestUser: string | null = null;
           for (const u of Array.from(normalizedUserIngredients)) {
-            const userTok = u.toLowerCase();
+            const userTok = u.toLowerCase().trim();
             if (userTok === recipeCanon) {
               bestDist = 0;
               bestUser = userTok;
@@ -246,6 +255,38 @@ export default function RecipePage() {
       setIngredientConfidences(confs);
     })();
   }, [recipe, normalizedUserIngredients]);
+
+  // Translate recipe steps when language changes
+  useEffect(() => {
+    if (!recipe || language === 'en' || !recipe.analyzedInstructions.length) {
+      setTranslatedSteps({});
+      return;
+    }
+
+    setTranslatingSteps(true);
+    (async () => {
+      try {
+        const steps = recipe.analyzedInstructions[0]?.steps || [];
+        const translated: Record<number, string> = {};
+
+        for (const step of steps) {
+          try {
+            const translatedText = await translateRecipeStep(step.step, language);
+            translated[step.number] = translatedText;
+          } catch (err) {
+            console.error(`Error translating step ${step.number}:`, err);
+            translated[step.number] = step.step; // Fall back to original
+          }
+        }
+
+        setTranslatedSteps(translated);
+      } catch (err) {
+        console.error('Error translating steps:', err);
+      } finally {
+        setTranslatingSteps(false);
+      }
+    })();
+  }, [recipe, language]);
 
   const handleMarkAsCooked = async () => {
     setCooking(true);
@@ -348,6 +389,18 @@ export default function RecipePage() {
     );
   }
 
+  // Wait for language preference to load before rendering
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-green-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-emerald-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading your language preference...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (error || !recipe) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-green-100 flex items-center justify-center p-4">
@@ -391,14 +444,17 @@ export default function RecipePage() {
       </div>
 
       <div className="relative z-10 container mx-auto px-4 py-8 max-w-5xl">
-        {/* Back button */}
-        <button
-          onClick={() => window.history.back()}
-          className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-semibold mb-6 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Back to Recipes
-        </button>
+        {/* Top controls */}
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={() => window.history.back()}
+            className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-semibold transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            {getTranslation('recipe.back', language)}
+          </button>
+          <LanguageSelector currentLanguage={language} onLanguageChange={updateLanguage} />
+        </div>
 
           {/* Hero section (purple theme like screenshot) */}
           <div className="rounded-3xl overflow-hidden mb-8 shadow-xl">
@@ -474,11 +530,11 @@ export default function RecipePage() {
             <div className="bg-white rounded-3xl shadow-xl p-6 sticky top-8">
               <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
                 <span className="inline-block w-6 h-6 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center">🍽️</span>
-                Your Ingredients
+                {getTranslation('recipe.ingredients', language)}
               </h2>
               <div className="mb-4 p-3 bg-emerald-50 rounded-xl">
                 <p className="text-sm text-emerald-700 font-medium">
-                  You have {ownedCount} of {totalCount} ingredients
+                  {getTranslation('recipe.owned', language)} {ownedCount} {getTranslation('recipe.of', language)} {totalCount} {getTranslation('recipe.ingredients_text', language)}
                 </p>
                 <div className="mt-2 h-2 bg-emerald-200 rounded-full overflow-hidden">
                   <div
@@ -496,13 +552,13 @@ export default function RecipePage() {
                       <div className="flex items-center gap-3">
                         <span className={`w-2 h-2 rounded-full ${owned ? 'bg-emerald-600' : 'bg-gray-300'}`} />
                         <div>
-                          <div className={`text-sm ${owned ? 'text-emerald-900 font-medium' : 'text-gray-700'}`}>{ingredient.name}</div>
+                          <div className={`text-sm ${owned ? 'text-emerald-900 font-medium' : 'text-gray-700'}`}>{translateIngredient(ingredient.name, language)}</div>
                           <div className="mt-1">
                             <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full ${conf === 'high' ? 'bg-emerald-100 text-emerald-800' : conf === 'medium' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
-                              {conf === 'high' ? 'High' : conf === 'medium' ? 'Medium' : 'Low'} match
+                              {conf === 'high' ? getTranslation('recipe.high_match', language) : conf === 'medium' ? getTranslation('recipe.medium_match', language) : getTranslation('recipe.low_match', language)}
                             </span>
                           </div>
-                          <div className="text-xs text-gray-500">{ingredient.original}</div>
+                          <div className="text-xs text-gray-500">{translateIngredient(ingredient.original, language)}</div>
                         </div>
                       </div>
                       <div className="text-xs text-gray-400">{ingredient.amount || ''}</div>
@@ -525,12 +581,12 @@ export default function RecipePage() {
                   ) : (
                     <>
                       <Flame className="w-5 h-5" />
-                      I Cooked This!
+                      {getTranslation('recipe.cooked', language)}
                     </>
                   )}
                 </button>
                 {ownedCount === 0 && (
-                  <p className="text-xs text-gray-500 mt-2 text-center">You don't have any ingredients for this recipe</p>
+                  <p className="text-xs text-gray-500 mt-2 text-center">You don&apos;t have any ingredients for this recipe</p>
                 )}
               </div>
             </div>
@@ -539,7 +595,7 @@ export default function RecipePage() {
           {/* Instructions & Nutrition (right) */}
           <div className="md:col-span-2 space-y-8">
             <div className="bg-white rounded-3xl shadow-xl p-8">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Cooking Instructions</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">{getTranslation('recipe.instructions', language)}</h2>
               {recipe.analyzedInstructions.length > 0 ? (
                 <ol className="space-y-6">
                   {recipe.analyzedInstructions[0].steps.map((step) => (
@@ -551,7 +607,11 @@ export default function RecipePage() {
                           {step.number}
                         </div>
                         <div className="flex-1">
-                          <p className="text-gray-700 leading-relaxed">{step.step}</p>
+                          <p className="text-gray-700 leading-relaxed">
+                            {language !== 'en' && translatedSteps[step.number]
+                              ? translatedSteps[step.number]
+                              : step.step}
+                          </p>
                           {step.length && (
                             <p className="text-sm text-gray-500 mt-2 flex items-center gap-1">
                               <Clock className="w-4 h-4" />
@@ -586,7 +646,7 @@ export default function RecipePage() {
             {recipe.nutrition && (
               <div className="bg-white/70 backdrop-blur-xl border border-emerald-100 rounded-3xl shadow-xl p-8">
                 <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                  Nutrition Facts
+                  {getTranslation('recipe.nutrition', language)}
                 </h2>
 
                 {/* Caloric breakdown */}

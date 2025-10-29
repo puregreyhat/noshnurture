@@ -115,7 +115,7 @@ export async function GET(request: Request) {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000);
         
-        const sugranUrl = `${SUGRAN.replace(/\/$/, '')}/api/recipes?limit=50`;
+        const sugranUrl = `${SUGRAN.replace(/\/$/, '')}/api/recipes?limit=100`;
         console.log(`[Recipes API] Fetching all recipes from: ${sugranUrl}`);
         
         const allResp = await fetch(sugranUrl, {
@@ -202,8 +202,8 @@ export async function GET(request: Request) {
           
           console.log(`[Recipes API] Final sorted order: ${sorted.map(r => `${r.title}(${r.matchedIngredientCount}/${r.totalIngredientCount}=${(r.totalIngredientCount > 0 ? (r.matchedIngredientCount/r.totalIngredientCount*100).toFixed(0) : 0)}%)`).join(' → ')}`);
           
-          // Return sorted Sugran recipes (max 6 or 12)
-          const maxDishes = showAll ? 12 : 6;
+          // Return sorted Sugran recipes (show all available recipes, up to 50)
+          const maxDishes = showAll ? 50 : 6;
           const finalSuggestions = sorted.slice(0, maxDishes);
           
           console.log(`[Recipes API] Final suggestions: ${finalSuggestions.length} recipes`);

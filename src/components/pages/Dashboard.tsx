@@ -218,20 +218,20 @@ export default function FoodDashboard() {
 
             switch (key) {
               case "foodTracked":
-                icon = <Utensils className="text-green-700" />;
+                icon = <Utensils className="text-emerald-600 w-8 h-8" />;
                 title = "Food Items Tracked";
-                gradient = "from-green-400 to-green-600";
+                gradient = "from-emerald-400 to-emerald-600";
                 break;
               case "expiringSoon":
-                icon = <Bell className="text-yellow-600" />;
+                icon = <Bell className="text-emerald-600 w-8 h-8" />;
                 title = "Expiring Soon";
-                gradient = "from-yellow-400 to-orange-500";
+                gradient = "from-emerald-300 to-emerald-500";
                 blink = true;
                 break;
               case "wasteReduced":
-                icon = <BarChart3 className="text-blue-600" />;
+                icon = <BarChart3 className="text-emerald-600 w-8 h-8" />;
                 title = "Waste Reduced";
-                gradient = "from-blue-400 to-cyan-500";
+                gradient = "from-emerald-500 to-emerald-700";
                 break;
             }
 
@@ -621,10 +621,10 @@ function SummaryCard({
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ scale: 1.07, rotate: 0.5 }}
       transition={{ duration: 0.6, delay: idx * 0.1 }}
-      className={`rounded-2xl p-5 text-white shadow-xl bg-gradient-to-r ${gradient} relative overflow-hidden`}
+      className={`rounded-2xl p-6 text-white shadow-xl bg-gradient-to-r ${gradient} relative overflow-hidden`}
     >
-      <div className="flex justify-between items-center mb-3">
-        <div className="text-2xl">{icon}</div>
+      <div className="flex justify-between items-start mb-4">
+        <div className="text-4xl p-2 bg-white/20 rounded-lg backdrop-blur-sm">{icon}</div>
         {blink && (
           <motion.span
             animate={{ opacity: [1, 0.2, 1] }}
@@ -633,8 +633,8 @@ function SummaryCard({
           ></motion.span>
         )}
       </div>
-      <h3 className="text-sm opacity-90">{title}</h3>
-      <p className="text-3xl font-extrabold mt-1 drop-shadow-md">{value}</p>
+      <h3 className="text-sm font-medium opacity-95">{title}</h3>
+      <p className="text-4xl font-extrabold mt-2 drop-shadow-lg">{value}</p>
     </motion.div>
   );
 }

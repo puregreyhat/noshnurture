@@ -14,7 +14,7 @@ export const CANONICAL_INGREDIENTS: ReadonlyArray<string> = [
   // Sauces & condiments
   "soy sauce","vinegar","tomato sauce","ketchup","chili sauce","mayonnaise","mustard","sriracha",
   // Spices & aromatics
-  "salt","sugar","black pepper","cumin","coriander powder","turmeric","garam masala","chili powder","paprika","clove","cardamom","cinnamon","bay leaf","asafoetida","hing","fenugreek","mustard seed","nigella","fennel","carom","ajwain","kasuri methi","curry leaves",
+  "salt","sugar","black pepper","cumin","coriander powder","turmeric","garam masala","chili powder","paprika","clove","cardamom","cinnamon","bay leaf","asafoetida","hing","fenugreek","mustard seed","nigella","fennel","carom","ajwain","kasuri methi","curry leaves","pav bhaji masala","chaat masala","sambar powder","rasam powder","tandoori masala",
   // Nuts & seeds
   "peanut","almond","cashew","walnut","sesame","chia","flaxseed",
   // Liquids & others

@@ -28,11 +28,18 @@ export const SYNONYMS: Record<string, string> = {
   chickpeas: "chickpea",
   lentils: "lentil",
   beans: "bean",
+  salts: "salt",
+  sugars: "sugar",
 
-  // Brand-y words stripped
+  // Brand-y words stripped (full phrases)
   "amul cheese": "cheese",
   "amul butter": "butter",
   "basa fish": "fish",
+  "everest pav bhaji masala": "pav bhaji masala",
+  "suhana pav bhaji masala": "pav bhaji masala",
+  "shan pav bhaji masala": "pav bhaji masala",
+  "tata salt": "salt",
+  "aashirvaad salt": "salt",
 
   // Common mistakes
   raddish: "radish",
