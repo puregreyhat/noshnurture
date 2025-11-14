@@ -126,8 +126,42 @@ If you cannot read the date clearly, set confidence to a lower value (0.3-0.7).`
 
     const parsedResult = JSON.parse(jsonMatch[0]);
 
+    // Helper function to parse date string to Date object
+    const parseDate = (dateStr: string | null): Date | null => {
+      if (!dateStr) return null;
+      // Handle DD-MM-YYYY format
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const year = parseInt(parts[2], 10);
+        return new Date(year, month - 1, day);
+      }
+      return null;
+    };
+
+    // Get both dates
+    let expiryDate = parsedResult.expiryDate;
+    const mfgDate = parsedResult.manufacturingDate;
+
+    // If we have both dates, use the larger one as expiry date
+    if (expiryDate && mfgDate) {
+      const expDate = parseDate(expiryDate);
+      const mfDate = parseDate(mfgDate);
+      
+      if (expDate && mfDate) {
+        // If mfg date is larger, it might actually be the expiry date
+        // Expiry should always be after manufacturing
+        if (mfDate > expDate) {
+          expiryDate = mfgDate;
+          // Move what was detected as expiry to manufacturing
+          parsedResult.manufacturingDate = parsedResult.expiryDate;
+        }
+      }
+    }
+
     return {
-      expiryDate: parsedResult.expiryDate,
+      expiryDate: expiryDate,
       confidence: parsedResult.confidence || 0.8,
       productName: parsedResult.productName,
       batchNumber: parsedResult.batchNumber,
