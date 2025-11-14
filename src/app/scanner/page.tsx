@@ -103,6 +103,11 @@ export default function ScannerPage() {
   // Handle OCR detection
   const handleOCRDetection = (data: any) => {
     try {
+      // Calculate days until expiry
+      const today = new Date();
+      const expiry = new Date(data.expiryDate);
+      const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
       const newProduct: InventoryItem = {
         name: data.productName || 'Unknown Product',
         quantity: 1,
@@ -111,6 +116,8 @@ export default function ScannerPage() {
         category: 'groceries',
         storageType: 'refrigerator',
         tags: data.batchNumber ? [`batch:${data.batchNumber}`] : [],
+        daysUntilExpiry,
+        commonUses: [],
       };
 
       const enhancedData: EnhancedScannedData = {
@@ -140,6 +147,11 @@ export default function ScannerPage() {
   // Handle voice input detection
   const handleVoiceDetection = (data: any) => {
     try {
+      // Calculate days until expiry
+      const today = new Date();
+      const expiry = new Date(data.expiryDate);
+      const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
       const newProduct: InventoryItem = {
         name: data.productName,
         quantity: data.quantity ? parseInt(data.quantity) : 1,
@@ -147,6 +159,9 @@ export default function ScannerPage() {
         expiryDate: data.expiryDate,
         category: 'groceries',
         storageType: 'refrigerator',
+        tags: [],
+        daysUntilExpiry,
+        commonUses: [],
       };
 
       const enhancedData: EnhancedScannedData = {
