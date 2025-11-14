@@ -36,10 +36,12 @@ export default function OCRScanner({ onExpiryDetected, onClose }: OCRScannerProp
   const startCamera = async () => {
     try {
       setError(null);
+      setIsCameraActive(true); // Show camera loading state immediately
       
       // Check if mediaDevices API is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setError('Camera not supported on this device. Please use gallery upload instead.');
+        setIsCameraActive(false);
         return;
       }
 
@@ -58,12 +60,10 @@ export default function OCRScanner({ onExpiryDetected, onClose }: OCRScannerProp
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Give the video element time to start playing
-        setTimeout(() => {
-          setIsCameraActive(true);
-        }, 500);
+        // Video is now playing - isCameraActive is already true
       }
     } catch (err: any) {
+      setIsCameraActive(false); // Hide camera on error
       const errorMessage = err?.name || err?.message || String(err);
       
       // Handle specific error types
@@ -79,15 +79,15 @@ export default function OCRScanner({ onExpiryDetected, onClose }: OCRScannerProp
           const basicStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
           if (videoRef.current) {
             videoRef.current.srcObject = basicStream;
-            setTimeout(() => {
-              setIsCameraActive(true);
-            }, 500);
+            // isCameraActive is already true from initial call
           }
         } catch (fallbackErr) {
+          setIsCameraActive(false);
           setError('Unable to access camera. Please use gallery upload instead.');
           console.error('Fallback camera error:', fallbackErr);
         }
       } else {
+        setIsCameraActive(false);
         setError('Unable to access camera. Please ensure you:\n1. Granted camera permission\n2. Are using HTTPS or localhost\n3. Try using gallery upload instead');
       }
       
