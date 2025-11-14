@@ -4,13 +4,15 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Camera, Upload, Keyboard, ArrowLeft, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Camera, Upload, Keyboard, ArrowLeft, AlertCircle, CheckCircle, X, Mic } from 'lucide-react';
 import { QRProduct, enhanceProductData, InventoryItem } from '@/lib/productUtils';
 import { normalizeIngredientName } from '@/lib/ingredients/normalize';
 import { getSettings } from '@/lib/settings';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Html5Qrcode } from 'html5-qrcode';
+import OCRScanner from '@/components/OCRScanner';
+import VoiceInput from '@/components/VoiceInput';
 
 interface ScannedProduct {
   name: string;
@@ -44,6 +46,8 @@ export default function ScannerPage() {
   };
   const [vkImporting, setVkImporting] = useState(false);
   const [toasts, setToasts] = useState<Array<{ id: number; content: React.ReactNode }>>([]);
+  const [showOCRScanner, setShowOCRScanner] = useState(false);
+  const [showVoiceInput, setShowVoiceInput] = useState(false);
 
   function addToast(content: React.ReactNode, timeout = 4000) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -93,6 +97,79 @@ export default function ScannerPage() {
       } catch (err) {
         console.error('Error stopping camera:', err);
       }
+    }
+  };
+
+  // Handle OCR detection
+  const handleOCRDetection = (data: any) => {
+    try {
+      const newProduct: InventoryItem = {
+        name: data.productName || 'Unknown Product',
+        quantity: 1,
+        unit: 'item',
+        expiryDate: data.expiryDate,
+        category: 'groceries',
+        storageType: 'refrigerator',
+        tags: data.batchNumber ? [`batch:${data.batchNumber}`] : [],
+      };
+
+      const enhancedData: EnhancedScannedData = {
+        orderId: `ocr-${Date.now()}`,
+        orderDate: new Date().toISOString().split('T')[0],
+        products: [newProduct],
+      };
+
+      setScannedData(enhancedData);
+      setShowOCRScanner(false);
+      addToast(
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+          <span>Product added: {data.productName}</span>
+        </div>
+      );
+    } catch (err) {
+      addToast(
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <span>Error adding product</span>
+        </div>
+      );
+    }
+  };
+
+  // Handle voice input detection
+  const handleVoiceDetection = (data: any) => {
+    try {
+      const newProduct: InventoryItem = {
+        name: data.productName,
+        quantity: data.quantity ? parseInt(data.quantity) : 1,
+        unit: data.unit || 'item',
+        expiryDate: data.expiryDate,
+        category: 'groceries',
+        storageType: 'refrigerator',
+      };
+
+      const enhancedData: EnhancedScannedData = {
+        orderId: `voice-${Date.now()}`,
+        orderDate: new Date().toISOString().split('T')[0],
+        products: [newProduct],
+      };
+
+      setScannedData(enhancedData);
+      setShowVoiceInput(false);
+      addToast(
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+          <span>Product added: {data.productName}</span>
+        </div>
+      );
+    } catch (err) {
+      addToast(
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <span>Error adding product</span>
+        </div>
+      );
     }
   };
 
@@ -616,6 +693,40 @@ export default function ScannerPage() {
                       </div>
                     </motion.button>
 
+                    {/* Scan Product Label (OCR) */}
+                    <motion.button
+                      onClick={() => setShowOCRScanner(true)}
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.85, duration: 0.35, ease: 'easeOut' }}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex flex-col items-center gap-3 p-6 bg-blue-50 border-2 border-blue-500 rounded-2xl hover:bg-blue-100 hover:shadow-lg transition-all"
+                    >
+                      <span className="text-3xl">📸</span>
+                      <div className="text-center">
+                        <h3 className="font-semibold text-blue-700">Scan Label</h3>
+                        <p className="text-xs text-blue-600 mt-1">Photo OCR</p>
+                      </div>
+                    </motion.button>
+
+                    {/* Voice Add */}
+                    <motion.button
+                      onClick={() => setShowVoiceInput(true)}
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.88, duration: 0.35, ease: 'easeOut' }}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex flex-col items-center gap-3 p-6 bg-purple-50 border-2 border-purple-500 rounded-2xl hover:bg-purple-100 hover:shadow-lg transition-all"
+                    >
+                      <Mic className="w-12 h-12 text-purple-600" />
+                      <div className="text-center">
+                        <h3 className="font-semibold text-purple-700">Voice Add</h3>
+                        <p className="text-xs text-purple-600 mt-1">Speak naturally</p>
+                      </div>
+                    </motion.button>
+
                     {/* Local Shop Form Entry */}
                     <motion.button
                       onClick={() => setScanMode('form')}
@@ -1001,6 +1112,22 @@ export default function ScannerPage() {
           </div>
         ))}
       </div>
+
+      {/* OCR Scanner Modal */}
+      {showOCRScanner && (
+        <OCRScanner 
+          onExpiryDetected={handleOCRDetection}
+          onClose={() => setShowOCRScanner(false)}
+        />
+      )}
+
+      {/* Voice Input Modal */}
+      {showVoiceInput && (
+        <VoiceInput 
+          onProductDetected={handleVoiceDetection}
+          onClose={() => setShowVoiceInput(false)}
+        />
+      )}
 
       <style jsx>{`
         @keyframes blob {
