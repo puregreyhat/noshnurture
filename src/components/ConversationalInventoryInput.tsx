@@ -56,6 +56,7 @@ export default function ConversationalInventoryInput({
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initializedRef = useRef(false);
+  const shouldAutoRestartRef = useRef(false);
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -80,17 +81,34 @@ export default function ConversationalInventoryInput({
 
     recognitionRef.current.onend = () => {
       setIsListening(false);
+      // Auto-restart recognition if we're waiting for input
+      if (shouldAutoRestartRef.current && !voiceDisabled) {
+        setTimeout(() => {
+          try {
+            recognitionRef.current?.start();
+          } catch (e) {
+            console.log('Already started or error restarting:', e);
+          }
+        }, 300);
+      }
     };
 
     recognitionRef.current.onresult = (event: any) => {
       let interimTranscript = '';
+      let finalTranscript = '';
+      
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          handleUserInput(transcript);
+          finalTranscript += transcript + ' ';
         } else {
           interimTranscript += transcript;
         }
+      }
+      
+      // Only process when we have a final transcript
+      if (finalTranscript.trim()) {
+        handleUserInput(finalTranscript.trim());
       }
     };
 
@@ -370,6 +388,7 @@ export default function ConversationalInventoryInput({
 
   const toggleListening = () => {
     if (isListening) {
+      shouldAutoRestartRef.current = false;
       recognitionRef.current?.stop();
     } else {
       // Reset error count when user tries voice again
@@ -385,6 +404,8 @@ export default function ConversationalInventoryInput({
         retryTimeoutRef.current = null;
       }
       
+      // Enable auto-restart when user starts listening
+      shouldAutoRestartRef.current = true;
       recognitionRef.current?.start();
     }
   };
