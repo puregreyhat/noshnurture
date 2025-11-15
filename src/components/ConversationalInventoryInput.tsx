@@ -400,8 +400,39 @@ export default function ConversationalInventoryInput({
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.9;
       utterance.pitch = 1;
+      // Set language for speech synthesis
+      utterance.lang = language === 'hi-IN' ? 'hi-IN' : 'en-IN';
+      
+      // For Hindi, try to find a Hindi voice
+      if (language === 'hi-IN') {
+        const voices = window.speechSynthesis.getVoices();
+        const hindiVoice = voices.find(voice => 
+          voice.lang.includes('hi') || voice.name.toLowerCase().includes('hindi')
+        );
+        if (hindiVoice) {
+          utterance.voice = hindiVoice;
+        } else {
+          // Fallback: use Google Translate TTS API for Hindi
+          speakViaGoogle(text, 'hi');
+          return;
+        }
+      }
+      
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  const speakViaGoogle = async (text: string, lang: string) => {
+    try {
+      // Google Translate TTS endpoint
+      const encodedText = encodeURIComponent(text);
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=${lang}&client=tw-ob`;
+      
+      const audio = new Audio(audioUrl);
+      audio.play().catch(err => console.log('Google TTS play error:', err));
+    } catch (error) {
+      console.log('Google TTS fallback failed, using system TTS');
     }
   };
 
@@ -555,7 +586,7 @@ function extractNumberFromText(text: string): number {
     return parseInt(digitMatch[1], 10);
   }
 
-  // Map of word numbers to digits
+  // Map of word numbers to digits (English)
   const wordNumbers: Record<string, number> = {
     'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
     'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
@@ -563,10 +594,25 @@ function extractNumberFromText(text: string): number {
     'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20,
   };
 
-  // Convert to lowercase and search for word numbers
+  // Hindi number words
+  const hindiNumbers: Record<string, number> = {
+    'शून्य': 0, 'एक': 1, 'दो': 2, 'तीन': 3, 'चार': 4, 'पाँच': 5,
+    'छह': 6, 'सात': 7, 'आठ': 8, 'नौ': 9, 'दस': 10,
+    'ग्यारह': 11, 'बारह': 12, 'तेरह': 13, 'चौदह': 14, 'पंद्रह': 15,
+    'सोलह': 16, 'सत्रह': 17, 'अठारह': 18, 'उन्नीस': 19, 'बीस': 20,
+  };
+
+  // Convert to lowercase for English word matching
   const lowerText = text.toLowerCase();
   for (const [word, num] of Object.entries(wordNumbers)) {
     if (lowerText.includes(word)) {
+      return num;
+    }
+  }
+
+  // Check for Hindi word numbers (no case conversion needed)
+  for (const [word, num] of Object.entries(hindiNumbers)) {
+    if (text.includes(word)) {
       return num;
     }
   }
