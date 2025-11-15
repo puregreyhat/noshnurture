@@ -353,16 +353,37 @@ export default function ConversationalInventoryInput({
         const qty = text.match(/\d+/)?.[0];
         if (qty) {
           setCurrentProductData(prev => ({ ...prev, quantity: qty }));
-          setCurrentField('unit');
-          addAIMessage(getMessage('quantityQuestion', { qty }));
+          
+          // Check if user also provided a unit in the same input
+          const unitVariations = ['kilogram', 'kg', 'gram', 'g', 'liter', 'liters', 'litre', 'litres', 'ml', 'milliliter', 'millilitre',
+                                 'piece', 'pieces', 'pcs', 'box', 'boxes', 'packet', 'packets', 'pkt', 'bottle', 'bottles', 'btl',
+                                 'can', 'cans', 'carton', 'cartons', 'ctn'];
+          const lowerText = text.toLowerCase();
+          const detectedUnit = unitVariations.find(u => lowerText.includes(u));
+          
+          if (detectedUnit) {
+            // User provided both quantity and unit, move to expiry
+            console.log('[QUANTITY FIELD] Detected unit in same input:', detectedUnit);
+            setCurrentProductData(prev => ({ ...prev, unit: detectedUnit }));
+            setCurrentField('expiry');
+            addAIMessage(getMessage('unitQuestion'));
+          } else {
+            // Only quantity provided, ask for unit
+            setCurrentField('unit');
+            addAIMessage(getMessage('quantityQuestion', { qty }));
+          }
         } else {
           addAIMessage(getMessage('quantityError'));
         }
       }
       // STEP 4: Get unit
       else if (currentField === 'unit') {
-        const units = ['kg', 'g', 'liter', 'liters', 'ml', 'pieces', 'boxes', 'packets', 'bottles', 'cans', 'cartons'];
-        const detectedUnit = units.find(u => text.toLowerCase().includes(u)) || text.trim();
+        const unitVariations = ['kilogram', 'kg', 'gram', 'g', 'liter', 'liters', 'litre', 'litres', 'ml', 'milliliter', 'millilitre',
+                               'piece', 'pieces', 'pcs', 'box', 'boxes', 'packet', 'packets', 'pkt', 'bottle', 'bottles', 'btl',
+                               'can', 'cans', 'carton', 'cartons', 'ctn'];
+        const lowerText = text.toLowerCase();
+        const detectedUnit = unitVariations.find(u => lowerText.includes(u)) || text.trim();
+        console.log('[UNIT FIELD] Detected unit:', detectedUnit, 'from input:', text);
         setCurrentProductData(prev => ({ ...prev, unit: detectedUnit }));
         setCurrentField('expiry');
         addAIMessage(getMessage('unitQuestion'));
@@ -775,7 +796,8 @@ function parseProductDetails(text: string): {
   let expiryDate = '';
   
   // Step 1: Extract quantity with unit (e.g., "1kg", "250 grams", "2 liters")
-  const qtyUnitMatch = text.match(/(\d+)\s*(kilogram|kg|gram|g|liter|liters|ml|milliliter|pieces|pcs|boxes|box|packets|packet|pkt|bottles|bottle|btl|cans|can|cartons|carton|ctn)?/i);
+  // Also handle when unit is separate: "1 kg", "2 liters", "500 ml"
+  const qtyUnitMatch = text.match(/(\d+)\s*(kilogram|kg|gram|g|liter|liters|litre|litres|ml|milliliter|millilitre|pieces|pcs|boxes|box|packets|packet|pkt|bottles|bottle|btl|cans|can|cartons|carton|ctn)?/i);
   let qtyUnitEnd = 0;
   
   if (qtyUnitMatch) {
@@ -786,7 +808,25 @@ function parseProductDetails(text: string): {
     qtyUnitEnd = text.indexOf(qtyUnitMatch[0]) + qtyUnitMatch[0].length;
   }
   
-  // Step 2: Extract date info (look for month/year/date keywords AFTER the quantity)
+  // Step 2: Also look for units that might appear as separate words (after quantity or even before)
+  // Search in remaining text if we have quantity but no unit yet
+  if (quantity && !unit) {
+    const unitKeywords = ['kilogram', 'kg', 'gram', 'g', 'liter', 'liters', 'litre', 'litres', 'ml', 'milliliter', 'millilitre',
+                          'piece', 'pieces', 'pcs', 'box', 'boxes', 'packet', 'packets', 'pkt', 'bottle', 'bottles', 'btl',
+                          'can', 'cans', 'carton', 'cartons', 'ctn'];
+    
+    for (const keyword of unitKeywords) {
+      if (lowerText.includes(keyword)) {
+        unit = keyword;
+        // Update qtyUnitEnd to include this unit in position tracking
+        const unitIndex = lowerText.indexOf(keyword);
+        qtyUnitEnd = Math.max(qtyUnitEnd, unitIndex + keyword.length);
+        break;
+      }
+    }
+  }
+  
+  // Step 3: Extract date info (look for month/year/date keywords AFTER the quantity)
   const dateKeywords = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december',
                         'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
                         'tomorrow', 'next month', 'next year', 'after a year', 'after a month'];
@@ -794,25 +834,25 @@ function parseProductDetails(text: string): {
   let dateStartIndex = -1;
   for (const keyword of dateKeywords) {
     const idx = lowerText.indexOf(keyword);
-    if (idx !== -1 && idx >= qtyUnitEnd) {  // Only look for dates AFTER quantity
+    if (idx !== -1 && idx >= qtyUnitEnd) {  // Only look for dates AFTER quantity/unit
       dateStartIndex = idx;
       expiryDate = text.substring(idx).trim();
       break;
     }
   }
   
-  // Also check for date patterns like "12/25/2025" or "25-12-2025" or just year "2025" or "2026"
-  const datePatternMatch = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\b\d{4}\b)/);
+  // Also check for date patterns like "12/25/2025" or "25-12-2025" or just year "2025" or "29 December"
+  const datePatternMatch = text.match(/(\d{1,2}\s+(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{4}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\b\d{4}\b)/i);
   if (datePatternMatch) {
     const patternIdx = text.indexOf(datePatternMatch[0]);
-    if (patternIdx >= qtyUnitEnd) {  // Only use if AFTER quantity
+    if (patternIdx >= qtyUnitEnd) {  // Only use if AFTER quantity/unit
       if (dateStartIndex === -1 || patternIdx < dateStartIndex) {
-        expiryDate = datePatternMatch[1] || datePatternMatch[0];
+        expiryDate = datePatternMatch[0];
       }
     }
   }
   
-  // Step 3: Extract name (everything before quantity or date)
+  // Step 4: Extract name (everything before quantity or date)
   let nameEnd = text.length;
   if (qtyUnitMatch) {
     nameEnd = text.indexOf(qtyUnitMatch[0]);
