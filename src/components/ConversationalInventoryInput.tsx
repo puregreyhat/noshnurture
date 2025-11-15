@@ -392,7 +392,10 @@ export default function ConversationalInventoryInput({
       else if (currentField === 'expiry') {
         // Parse the expiry date
         const extractedData = await extractProductDetailsFromSpeech(text);
-        const expiryDate = extractedData.expiryDate || text.trim();
+        let expiryDate = extractedData.expiryDate || text.trim();
+        
+        // Convert relative dates like "tomorrow" to actual dates
+        expiryDate = convertRelativeDate(expiryDate);
         
         const completedProduct: PendingProduct = {
           ...currentProductData,
@@ -780,6 +783,47 @@ function abbreviateUnit(unit: string): string {
   return normalized;
 }
 
+// Convert relative date keywords to actual dates (DD-MM-YYYY format)
+function convertRelativeDate(dateStr: string): string {
+  const today = new Date();
+  const lowerStr = dateStr.toLowerCase().trim();
+  
+  // Helper to format date as DD-MM-YYYY
+  const formatDate = (date: Date) => {
+    return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
+  };
+  
+  if (lowerStr.includes('tomorrow')) {
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return formatDate(tomorrow);
+  }
+  
+  if (lowerStr.includes('today')) {
+    return formatDate(today);
+  }
+  
+  if (lowerStr.includes('next month')) {
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    return formatDate(nextMonth);
+  }
+  
+  if (lowerStr.includes('after a year') || lowerStr.includes('a year') || lowerStr.includes('one year')) {
+    const nextYear = new Date(today);
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    return formatDate(nextYear);
+  }
+  
+  if (lowerStr.includes('after a month') || lowerStr.includes('a month') || lowerStr.includes('one month')) {
+    const nextMonthDate = new Date(today);
+    nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+    return formatDate(nextMonthDate);
+  }
+  
+  // If already in a date format or month name, return as-is
+  return dateStr;
+}
+
 // Parse complete product details from a single line
 // Returns object with: name, quantity, unit, expiryDate (or null for missing fields)
 function parseProductDetails(text: string): {
@@ -867,6 +911,11 @@ function parseProductDetails(text: string): {
   // If we have quantity but name is empty or is just the qty/unit, clear the name
   if (quantity && (!name || name === text.trim())) {
     name = '';
+  }
+  
+  // Convert relative dates like "tomorrow" to actual dates
+  if (expiryDate) {
+    expiryDate = convertRelativeDate(expiryDate);
   }
   
   return {
