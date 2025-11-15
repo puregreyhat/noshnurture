@@ -100,8 +100,10 @@ export default function ConversationalInventoryInput({
       // Only process when we have a final transcript
       if (finalTranscript.trim()) {
         console.log('Voice input received:', finalTranscript.trim());
+        console.log('About to call handleUserInputRef.current, ref is:', handleUserInputRef.current ? 'SET' : 'NULL');
         // Call the handler directly using current state, not stale closure
         handleUserInputRef.current?.(finalTranscript.trim());
+        console.log('Called handleUserInputRef.current');
       }
     };
 
@@ -259,6 +261,7 @@ export default function ConversationalInventoryInput({
   const handleUserInput = async (text: string) => {
     if (!text.trim()) return;
 
+    console.log('[handleUserInput] Called with text:', text, 'currentField:', currentField);
     addUserMessage(text);
     setIsProcessing(true);
 
