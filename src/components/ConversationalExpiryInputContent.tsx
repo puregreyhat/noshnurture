@@ -108,8 +108,10 @@ export default function ConversationalExpiryInputContent({
 
   // Start conversation
   useEffect(() => {
-    if (messages.length === 0) {
-      askForExpiryDate();
+    if (messages.length === 0 && products.length > 0) {
+      addAIMessage(
+        `Give expiry date for 1) ${products[0].productName} (${products[0].quantity} ${products[0].unit}, ${products[0].size})`
+      );
     }
   }, []);
 
@@ -135,14 +137,6 @@ export default function ConversationalExpiryInputContent({
     setMessages((prev) => [...prev, { type: 'user', content }]);
   };
 
-  const askForExpiryDate = () => {
-    if (currentProductIndex < products.length) {
-      const product = products[currentProductIndex];
-      const message = `Give expiry date for ${currentProductIndex + 1}) ${product.productName} (${product.quantity} ${product.unit}, ${product.size})`;
-      addAIMessage(message);
-    }
-  };
-
   const processDateInput = async (input: string) => {
     if (!input.trim()) return;
 
@@ -160,10 +154,14 @@ export default function ConversationalExpiryInputContent({
         addAIMessage(`✓ Got ${parsedDate} for ${product.productName}`);
 
         // Move to next product or complete
-        if (currentProductIndex + 1 < products.length) {
+        const nextIndex = currentProductIndex + 1;
+        if (nextIndex < products.length) {
+          // Ask for next product's expiry date
           setTimeout(() => {
-            setCurrentProductIndex(currentProductIndex + 1);
-            askForExpiryDate();
+            addAIMessage(
+              `Give expiry date for ${nextIndex + 1}) ${products[nextIndex].productName} (${products[nextIndex].quantity} ${products[nextIndex].unit}, ${products[nextIndex].size})`
+            );
+            setCurrentProductIndex(nextIndex);
           }, 1000);
         } else {
           // All products done

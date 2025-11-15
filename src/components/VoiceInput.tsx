@@ -17,6 +17,7 @@ interface VoiceInputProps {
 
 interface SpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
+  resultIndex: number;
   isFinal: boolean;
 }
 
@@ -56,12 +57,15 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
+      setVoiceAvailable(false);
       setError('Speech recognition not supported in your browser');
       return;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = true;
+    // Use continuous: false for better desktop support
+    // Mobile will still work, desktop won't hang
+    recognition.continuous = false;
     recognition.interimResults = true;
     recognition.language = language;
 
@@ -69,7 +73,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
       let interim = '';
       let final = '';
 
-      for (let i = event.results.length - 1; i >= 0; i--) {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
 
         if (event.results[i].isFinal) {
@@ -94,6 +98,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
       const errorCode = errorEvent.error;
       
       console.error('Speech recognition error:', errorCode);
+      console.error('Browser:', navigator.userAgent);
       setIsListening(false);
       
       // For any error, disable voice and keep text input active
@@ -107,6 +112,13 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
       } else if (errorCode === 'not-allowed') {
         setVoiceAvailable(false);
         setError('Microphone access denied. Using text input instead.');
+      } else if (errorCode === 'service-not-allowed') {
+        setVoiceAvailable(false);
+        setError('Speech recognition service not available in your browser.');
+      } else if (errorCode === 'bad-grammar') {
+        setError('Grammar error. Please try again or use text input.');
+      } else if (errorCode === 'aborted') {
+        setError('Voice input was interrupted. Please try again.');
       } else {
         setError(`Voice error: ${errorCode}. Please use text input.`);
       }
@@ -126,10 +138,17 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
 
   const startListeningInternal = () => {
     try {
+      console.log('Starting voice recognition:', {
+        browser: navigator.userAgent,
+        language: language,
+        voiceAvailable: voiceAvailable,
+      });
       recognitionRef.current?.start();
       setIsListening(true);
     } catch (err) {
       console.debug('Recognition start error:', err);
+      setVoiceAvailable(false);
+      setError('Could not start voice recognition. Please use text input.');
     }
   };
 

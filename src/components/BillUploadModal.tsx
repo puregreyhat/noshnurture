@@ -76,18 +76,28 @@ export default function BillUploadModal({
       reader.onload = async (e) => {
         try {
           const result = e.target?.result;
-          
-          // Ensure result is a string
-          if (typeof result !== 'string') {
+          let base64 = '';
+
+          // Handle both ArrayBuffer (for PDFs) and String (for images)
+          if (result instanceof ArrayBuffer) {
+            // Convert ArrayBuffer to base64
+            const bytes = new Uint8Array(result);
+            let binaryString = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+              binaryString += String.fromCharCode(bytes[i]);
+            }
+            base64 = btoa(binaryString);
+          } else if (typeof result === 'string') {
+            // Extract base64 from data URL (format: data:image/png;base64,xxxxx)
+            if (result.includes(',')) {
+              base64 = result.split(',')[1];
+            } else {
+              base64 = result;
+            }
+          } else {
             setError('Failed to read file. Please try another file.');
             setIsLoading(false);
             return;
-          }
-
-          // Extract base64 from data URL (format: data:image/png;base64,xxxxx or data:application/pdf;base64,xxxxx)
-          let base64 = result;
-          if (result.includes(',')) {
-            base64 = result.split(',')[1];
           }
 
           // Validate base64
