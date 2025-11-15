@@ -68,6 +68,7 @@ export default function ScannerPage() {
   }
   const [scanMode, setScanMode] = useState<'none' | 'camera' | 'upload' | 'manual' | 'form'>('none');
   const [scannedData, setScannedData] = useState<ScannedData | EnhancedScannedData | null>(null);
+  const [dataSource, setDataSource] = useState<'qr' | 'ocr' | 'voice' | 'batch' | 'bill' | null>(null);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [manualInput, setManualInput] = useState('');
@@ -83,6 +84,42 @@ export default function ScannerPage() {
   }); 
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const autoFetchDoneRef = useRef(false);
+
+  // Helper function to parse expiry date properly
+  const parseExpiryDate = (dateString: string): string => {
+    if (!dateString) return '';
+    
+    // If already in DD-MM-YYYY format, return as is
+    if (/^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
+      return dateString;
+    }
+    
+    // Try to parse as Date
+    const parsedDate = new Date(dateString);
+    if (!isNaN(parsedDate.getTime())) {
+      const day = String(parsedDate.getDate()).padStart(2, '0');
+      const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+      const year = parsedDate.getFullYear();
+      return `${day}-${month}-${year}`;
+    }
+    
+    return dateString;
+  };
+
+  // Helper function to calculate days until expiry with proper date handling
+  const calculateDaysUntilExpiry = (expiryDateStr: string): number => {
+    try {
+      const [day, month, year] = expiryDateStr.split('-').map(Number);
+      const expiry = new Date(year, month - 1, day);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      expiry.setHours(0, 0, 0, 0);
+      const diff = expiry.getTime() - today.getTime();
+      return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    } catch (e) {
+      return 999; // Default to future if parsing fails
+    }
+  };
 
   // Cleanup camera on unmount
   useEffect(() => {
@@ -107,16 +144,14 @@ export default function ScannerPage() {
   // Handle OCR detection
   const handleOCRDetection = (data: any) => {
     try {
-      // Calculate days until expiry
-      const today = new Date();
-      const expiry = new Date(data.expiryDate);
-      const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const expiryDate = parseExpiryDate(data.expiryDate);
+      const daysUntilExpiry = calculateDaysUntilExpiry(expiryDate);
       
       const newProduct: InventoryItem = {
         name: data.productName || 'Unknown Product',
         quantity: 1,
         unit: 'item',
-        expiryDate: data.expiryDate,
+        expiryDate: expiryDate,
         category: 'groceries',
         storageType: 'refrigerator',
         tags: data.batchNumber ? [`batch:${data.batchNumber}`] : [],
@@ -131,6 +166,7 @@ export default function ScannerPage() {
       };
 
       setScannedData(enhancedData);
+      setDataSource('ocr');
       setShowOCRScanner(false);
       addToast(
         <div className="flex items-center gap-2">
@@ -152,15 +188,14 @@ export default function ScannerPage() {
   const handleVoiceDetection = (data: any) => {
     try {
       // Calculate days until expiry
-      const today = new Date();
-      const expiry = new Date(data.expiryDate);
-      const daysUntilExpiry = Math.floor((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      const expiryDate = parseExpiryDate(data.expiryDate);
+      const daysUntilExpiry = calculateDaysUntilExpiry(expiryDate);
       
       const newProduct: InventoryItem = {
         name: data.productName,
         quantity: data.quantity ? parseInt(data.quantity) : 1,
         unit: data.unit || 'item',
-        expiryDate: data.expiryDate,
+        expiryDate: expiryDate,
         category: 'groceries',
         storageType: 'refrigerator',
         tags: [],
@@ -175,6 +210,7 @@ export default function ScannerPage() {
       };
 
       setScannedData(enhancedData);
+      setDataSource('voice');
       setShowVoiceInput(false);
       addToast(
         <div className="flex items-center gap-2">
@@ -203,18 +239,15 @@ export default function ScannerPage() {
   ) => {
     try {
       const inventoryItems: InventoryItem[] = products.map((product) => {
-        const expiryDate = new Date(product.expiryDate);
-        const today = new Date();
-        const daysUntilExpiry = Math.ceil(
-          (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        const expiryDate = parseExpiryDate(product.expiryDate);
+        const daysUntilExpiry = calculateDaysUntilExpiry(expiryDate);
 
         return {
           id: `conv-${Date.now()}-${Math.random()}`,
           name: product.name,
           quantity: product.quantity,
           unit: product.unit,
-          expiryDate: product.expiryDate,
+          expiryDate: expiryDate,
           category: 'groceries',
           storageType: 'refrigerator',
           tags: [],
@@ -230,6 +263,7 @@ export default function ScannerPage() {
       };
 
       setScannedData(enhancedData);
+      setDataSource('batch');
       setShowConversationalInput(false);
       addToast(
         <div className="flex items-center gap-2">
@@ -260,18 +294,15 @@ export default function ScannerPage() {
   ) => {
     try {
       const inventoryItems: InventoryItem[] = products.map((product) => {
-        const expiryDate = new Date(product.expiryDate);
-        const today = new Date();
-        const daysUntilExpiry = Math.ceil(
-          (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-        );
+        const expiryDate = parseExpiryDate(product.expiryDate);
+        const daysUntilExpiry = calculateDaysUntilExpiry(expiryDate);
 
         return {
           id: `bill-${Date.now()}-${Math.random()}`,
           name: product.name,
           quantity: product.quantity,
           unit: product.unit,
-          expiryDate: product.expiryDate,
+          expiryDate: expiryDate,
           category: 'groceries',
           storageType: 'refrigerator',
           tags: [],
@@ -287,6 +318,7 @@ export default function ScannerPage() {
       };
 
       setScannedData(enhancedData);
+      setDataSource('bill');
       setShowBillUpload(false);
       addToast(
         <div className="flex items-center gap-2">
@@ -321,6 +353,9 @@ export default function ScannerPage() {
       const enhancedProducts: InventoryItem[] = [];
       for (const p of data.products as QRProduct[]) {
         const item = enhanceProductData(p);
+        // Parse and format expiry date properly
+        item.expiryDate = parseExpiryDate(item.expiryDate);
+        item.daysUntilExpiry = calculateDaysUntilExpiry(item.expiryDate);
         // compute a canonical ingredient name for AI-like normalization (free)
         try {
           const preferSemantic = typeof window !== 'undefined' ? getSettings().useSemanticNormalization : false;
@@ -340,6 +375,7 @@ export default function ScannerPage() {
       };
 
       setScannedData(enhancedData);
+      setDataSource('qr');
       setScanMode('none');
       await stopCamera();
     } catch {
@@ -1177,7 +1213,14 @@ export default function ScannerPage() {
                     <CheckCircle className="w-7 h-7 text-emerald-600" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900">QR Code Scanned Successfully!</h2>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      {dataSource === 'qr' && 'QR Code Scanned Successfully!'}
+                      {dataSource === 'ocr' && 'Product Detected Successfully!'}
+                      {dataSource === 'voice' && 'Product Added via Voice!'}
+                      {dataSource === 'batch' && 'Batch Products Added!'}
+                      {dataSource === 'bill' && 'Products Extracted from Bill!'}
+                      {!dataSource && 'Product Added Successfully!'}
+                    </h2>
                     <p className="text-sm text-gray-600">
                       Order ID: <span className="font-semibold">{scannedData.orderId}</span> • Date: {formatLocalISO(scannedData.orderDate as string)}
                     </p>
@@ -1193,7 +1236,13 @@ export default function ScannerPage() {
                   </h3>
                   <div className="space-y-3">
                     {scannedData.products.map((product, idx) => {
-                      const { days, status } = getDaysUntilExpiry(product.expiryDate);
+                      const daysLeft = calculateDaysUntilExpiry(product.expiryDate);
+                      let status = 'fresh';
+                      if (daysLeft < 0) status = 'expired';
+                      else if (daysLeft === 0) status = 'warning';
+                      else if (daysLeft <= 3) status = 'warning';
+                      else if (daysLeft <= 7) status = 'caution';
+                      
                       const statusConfig: Record<string, string> = {
                         fresh: 'bg-green-100/50 border-green-400/50 text-green-800',
                         caution: 'bg-yellow-100/50 border-yellow-400/50 text-yellow-800',
@@ -1227,7 +1276,7 @@ export default function ScannerPage() {
                                 'bg-red-200 text-red-900'
                               }`}>
                                 {status === 'expired' ? '❌' : status === 'warning' ? '⚠️' : status === 'caution' ? '⏰' : '✅'}
-                                {days >= 0 ? `${days} days` : 'Expired'}
+                                {daysLeft >= 0 ? `${daysLeft} days` : 'Expired'}
                               </div>
                             </div>
                           </div>
@@ -1253,6 +1302,7 @@ export default function ScannerPage() {
                 <button
                   onClick={() => {
                     setScannedData(null);
+                    setDataSource(null);
                     setScanMode('none');
                     setError('');
                   }}

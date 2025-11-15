@@ -353,6 +353,8 @@ export async function extractProductDetailsFromSpeech(
 }> {
   try {
     const apiKey = getGeminiApiKey();
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
@@ -367,6 +369,7 @@ export async function extractProductDetailsFromSpeech(
               parts: [
                 {
                   text: `You are an expert at parsing natural language product inventory information spoken by users.
+TODAY'S DATE IS: ${todayStr}
 
 Analyze this user input and extract product details:
 "${userInput}"
@@ -375,7 +378,7 @@ Extract the following information if present:
 1. **Product Name** - The brand and product type (e.g., "Fortune Biryani Rice", "Good Day Biscuits")
 2. **Quantity** - The numeric amount (e.g., "1", "5", "10")
 3. **Unit** - The unit of measurement (e.g., "kg", "liter", "pieces", "boxes", "packets")
-4. **Expiry Date** - The expiration date in any format (e.g., "29 06 2026", "29-06-2026", "June 2026")
+4. **Expiry Date** - The expiration date in any format (e.g., "29 06 2026", "29-06-2026", "June 2026", "a year after", "6 months from now")
 
 Return ONLY a JSON object with this exact structure:
 {
@@ -390,9 +393,13 @@ Return ONLY a JSON object with this exact structure:
 Important rules:
 - Convert dates to DD-MM-YYYY format (e.g., "29 06 2026" → "29-06-2026")
 - For dates like "June 2026", use the last day of month: "30-06-2026"
+- For RELATIVE dates:
+  - "a year after" = add 365 days to today
+  - "6 months from now" = add 6 months to today
+  - "next month" = first day of next month from today
+  - "in 3 months" = add 3 months to today
 - Extract ONLY what is mentioned, set others to null
-- Confidence: 1.0 = all fields found, 0.5 = some fields found, 0.3 = very unclear
-- If expiry date is incomplete (e.g., "29th"), ask for clarification in notes`,
+- Confidence: 1.0 = all fields found, 0.5 = some fields found, 0.3 = very unclear`,
                 },
               ],
             },
