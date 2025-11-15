@@ -180,8 +180,13 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
       setIsProcessing(true);
       setError(null);
 
-      // Remove interim results marker if present (format: "final|interim")
-      const cleanText = textToProcess.split('|')[0].trim();
+      // Remove interim results marker if present (format: "final|interim" or "final|")
+      // Split by | and take the first part, then any part that's not empty
+      const parts = textToProcess.split('|');
+      const cleanText = parts
+        .filter(p => p.trim().length > 0)
+        .join(' ')
+        .trim();
 
       if (!cleanText) {
         setError('No valid input detected. Please try again.');
@@ -212,9 +217,13 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
     }
   };
 
-  // Extract final transcript (before |)
+  // Extract final transcript (before |), handling all edge cases
   const getFinalTranscript = () => {
-    return transcript.split('|')[0].trim();
+    const parts = transcript.split('|');
+    return parts
+      .filter(p => p.trim().length > 0)
+      .join(' ')
+      .trim();
   };
 
   return (
@@ -312,7 +321,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
               {transcript && (
                 <div className="bg-gray-50 rounded-lg p-3 mt-3">
                   <p className="text-xs text-gray-600 mb-1">You said:</p>
-                  <p className="text-gray-800 text-sm">{transcript}</p>
+                  <p className="text-gray-800 text-sm">{getFinalTranscript()}</p>
                 </div>
               )}
             </div>
@@ -353,12 +362,21 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
           {/* Examples */}
           <div className="bg-blue-50 rounded-lg p-3">
             <p className="text-xs font-medium text-blue-900 mb-2">Examples:</p>
-            <ul className="text-xs text-blue-800 space-y-1">
-              <li>✓ "milk expiring December 15"</li>
-              <li>✓ "butter milk expires 15-12-2025"</li>
-              <li>✓ "500g yogurt valid till tomorrow"</li>
-              <li>✓ "flour expiring next month"</li>
-            </ul>
+            {language === 'en-IN' ? (
+              <ul className="text-xs text-blue-800 space-y-1">
+                <li>✓ "milk expiring December 15"</li>
+                <li>✓ "butter milk expires 15-12-2025"</li>
+                <li>✓ "500g yogurt valid till tomorrow"</li>
+                <li>✓ "flour expiring next month"</li>
+              </ul>
+            ) : (
+              <ul className="text-xs text-blue-800 space-y-1">
+                <li>✓ "दूध की वैधता कल तक" (Milk वैधता till tomorrow)</li>
+                <li>✓ "पनीर की वैधता 20 दिसंबर तक" (Paneer वैधता till Dec 20)</li>
+                <li>✓ "योगर्ट वैधता 15 12 2025" (Yogurt वैधता 15-12-2025)</li>
+                <li>✓ "आटा वैधता अगले महीने तक" (Flour वैधता till next month)</li>
+              </ul>
+            )}
           </div>
         </div>
       </div>
