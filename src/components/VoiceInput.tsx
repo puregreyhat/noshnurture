@@ -170,10 +170,14 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
   };
 
   const processTranscript = async () => {
-    const textToProcess = useTextInput ? manualText : transcript;
+    // Use voice transcript if available, otherwise use manual text
+    const hasVoiceInput = getFinalTranscript().trim().length > 0;
+    const hasTextInput = manualText.trim().length > 0;
+    
+    const textToProcess = hasVoiceInput ? transcript : manualText;
     
     if (!textToProcess.trim()) {
-      setError(useTextInput ? 'Please type something first' : 'Please say something first');
+      setError('Please provide input (text or voice)');
       return;
     }
 
@@ -197,7 +201,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
       const result = await processVoiceInput(cleanText);
 
       if (!result.productName || !result.expiryDate) {
-        setError(`Could not understand. Please ${useTextInput ? 'type' : 'say'}: "Add [product name] expiring [date]"`);
+        setError('Could not understand. Please try: "Add [product name] expiring [date]"');
         return;
       }
 
