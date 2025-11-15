@@ -180,8 +180,13 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
       setIsProcessing(true);
       setError(null);
 
-      // Remove interim results marker if present
+      // Remove interim results marker if present (format: "final|interim")
       const cleanText = textToProcess.split('|')[0].trim();
+
+      if (!cleanText) {
+        setError('No valid input detected. Please try again.');
+        return;
+      }
 
       const result = await processVoiceInput(cleanText);
 
@@ -205,6 +210,11 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Extract final transcript (before |)
+  const getFinalTranscript = () => {
+    return transcript.split('|')[0].trim();
   };
 
   return (
@@ -333,7 +343,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
             </button>
             <button
               onClick={processTranscript}
-              disabled={(!manualText.trim() && !transcript.trim()) || isProcessing}
+              disabled={(!manualText.trim() && !getFinalTranscript()) || isProcessing}
               className="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition disabled:opacity-50"
             >
               Confirm

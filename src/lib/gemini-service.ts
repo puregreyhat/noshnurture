@@ -462,9 +462,21 @@ export async function extractProductsFromBill(
             {
               parts: [
                 {
-                  text: `You are an expert at reading bills, receipts, and invoices.
+                  text: `You are an expert at reading bills, receipts, and invoices. Your job is to extract ONLY food and grocery items (perishable and non-perishable).
 
-Extract ALL products/line items from this bill/receipt. For each product, extract:
+IMPORTANT: Filter out non-food items like clothing, bedsheets, books, cosmetics, electronics, etc. Extract ONLY:
+- Dairy products (milk, yogurt, butter, cheese, etc.)
+- Fruits and vegetables
+- Grains, cereals, and flour
+- Beverages (juice, tea, coffee, etc.)
+- Packaged snacks and foods
+- Oils, spices, and condiments
+- Meat and seafood
+- Bakery items
+
+DO NOT extract: Clothing, bedsheets, books, cosmetics, electronics, household items, or any non-food products.
+
+For each FOOD product found, extract:
 1. Product Name - The full product name/description as shown on bill
 2. Quantity - The numeric quantity (e.g., "1", "5", "10")
 3. Unit - Unit of measurement (boxes, packets, kg, liters, pieces, etc.)
@@ -477,7 +489,7 @@ Important rules:
 - Quantity: Extract only the number before unit
 - Size: Extract weight/volume mentioned on product line
 - DO NOT merge products - if same product appears twice, list as separate rows
-- Include ALL visible line items
+- Include ONLY food/grocery items, exclude everything else
 
 Return ONLY a JSON array:
 [
@@ -490,7 +502,7 @@ Return ONLY a JSON array:
   }
 ]
 
-Example format for Indian bills:
+Example format for Indian bills (FOOD ITEMS ONLY):
 [
   {
     "productName": "Fabsta Corn Flakes",
@@ -506,7 +518,9 @@ Example format for Indian bills:
     "size": "1L",
     "price": "60"
   }
-]`,
+]
+
+If the bill contains NO food items, return an empty array: []`,
                 },
                 {
                   inlineData: {
