@@ -213,14 +213,14 @@ export default function ConversationalInventoryInput({
         greeting: "Hello! I'll help you add products to your inventory. How many products would you like to add today?",
         perfect: `Perfect! I'll help you add ${params?.count} products. Let's start with product 1. What is the product name?`,
         countError: "I didn't catch that. Please tell me how many products (e.g., 'I have 3 products' or just '3')",
-        nameConfirm: `Got it - ${params?.name}. What's the quantity? (e.g., '2' or '500')`,
+        nameConfirm: `Got it - ${params?.name}. What's the quantity? (e.g., '2 kg' or '255 grams')`,
         quantityQuestion: `${params?.qty} what? (e.g., 'kg', 'liters', 'packets', 'boxes')`,
         quantityError: `I didn't get that. Please tell me the quantity as a number (e.g., '2' for 2 kg)`,
         unitQuestion: `Great! Now, what's the expiry date? (e.g., '29 06 2026' or 'December 25')`,
-        productAdded: `✓ Added ${params?.qty} ${params?.unit} of ${params?.name} expiring on ${params?.expiry}. Say "next" or "confirm" to add the next product, or "done" if finished.`,
-        nextProduct: `Great! Now let's add product ${params?.nextIndex}. What is the product name?`,
-        allAdded: "Perfect! All products have been added. Submitting your inventory...",
-        invalidCommand: "Please say 'next' or 'confirm' to add another product, or 'done' if you're finished.",
+        productAdded: `✓ ${params?.name} ${params?.qty}${params?.unit} (${params?.expiry})`,
+        nextProduct: `Great! Product ${params?.nextIndex}. What is the name?`,
+        allAdded: "Perfect! Submitting...",
+        invalidCommand: "Say 'next' or 'done'",
         networkRetry: `Network issue. Retrying in ${params?.delay} seconds...`,
         noSpeech: "No speech detected. Please try again.",
         micNotAvailable: "Microphone not available. Please check permissions.",
@@ -235,10 +235,10 @@ export default function ConversationalInventoryInput({
         quantityQuestion: `${params?.qty} क्या? (जैसे 'किलो', 'लीटर', 'पैकेट', 'डिब्बे')`,
         quantityError: `मुझे समझ नहीं आया। कृपया मात्रा बताएं (जैसे '2' किलो के लिए)`,
         unitQuestion: `शानदार! अब एक्सपायरी तारीख क्या है? (जैसे '29 06 2026' या 'दिसंबर 25')`,
-        productAdded: `✓ ${params?.qty} ${params?.unit} ${params?.name} जोड़ा गया, एक्सपायरी ${params?.expiry} को है। "अगला" या "पुष्टि" कहें अगला प्रोडक्ट जोड़ने के लिए, या "हो गया" अगर समाप्त।`,
-        nextProduct: `शानदार! अब प्रोडक्ट ${params?.nextIndex} जोड़ते हैं। प्रोडक्ट का नाम क्या है?`,
-        allAdded: "बहुत अच्छा! सभी प्रोडक्ट जोड़ दिए गए हैं। आपकी इन्वेंटरी सबमिट की जा रही है...",
-        invalidCommand: "'अगला' या 'पुष्टि' कहें अगला प्रोडक्ट जोड़ने के लिए, या 'हो गया' अगर आप पूरा कर चुके हैं।",
+        productAdded: `✓ ${params?.name} ${params?.qty}${params?.unit} (${params?.expiry})`,
+        nextProduct: `शानदार! प्रोडक्ट ${params?.nextIndex}। नाम क्या है?`,
+        allAdded: "बहुत अच्छा! सबमिट किया जा रहा है...",
+        invalidCommand: "'अगला' या 'हो गया' कहें",
         networkRetry: `नेटवर्क समस्या। ${params?.delay} सेकंड में दोबारा कोशिश की जा रही है...`,
         noSpeech: "कोई आवाज़ नहीं सुनाई दी। कृपया दोबारा कोशिश करें।",
         micNotAvailable: "माइक्रोफोन उपलब्ध नहीं है। कृपया अनुमतियां जांचें।",
@@ -317,10 +317,15 @@ export default function ConversationalInventoryInput({
         };
 
         setProducts(prev => [...prev, completedProduct]);
+        
+        // Normalize quantity and unit for compact display
+        const normalizedQty = normalizeQuantity(completedProduct.quantity);
+        const normalizedUnit = abbreviateUnit(completedProduct.unit);
+        
         addAIMessage(
           getMessage('productAdded', {
-            qty: completedProduct.quantity,
-            unit: completedProduct.unit,
+            qty: normalizedQty,
+            unit: normalizedUnit,
             name: completedProduct.name,
             expiry: expiryDate,
           })
@@ -639,4 +644,51 @@ function extractNumberFromText(text: string): number {
   }
 
   return 0;
+}
+
+// Convert word quantity to number (e.g., "one" -> "1", "two kilograms" -> "2")
+function normalizeQuantity(qty: string): string {
+  const lowerQty = qty.toLowerCase().trim();
+  
+  // Extract the number from the quantity
+  const num = extractNumberFromText(lowerQty);
+  if (num > 0) {
+    return num.toString();
+  }
+  
+  return qty;
+}
+
+// Abbreviate unit names (e.g., "kilogram" -> "kg", "liters" -> "L")
+function abbreviateUnit(unit: string): string {
+  const unitMap: Record<string, string> = {
+    'kilogram': 'kg',
+    'kg': 'kg',
+    'gram': 'g',
+    'g': 'g',
+    'liter': 'L',
+    'liters': 'L',
+    'l': 'L',
+    'ml': 'ml',
+    'milliliter': 'ml',
+    'pieces': 'pcs',
+    'piece': 'pcs',
+    'pcs': 'pcs',
+    'boxes': 'box',
+    'box': 'box',
+    'packets': 'pkt',
+    'packet': 'pkt',
+    'pkt': 'pkt',
+    'bottles': 'btl',
+    'bottle': 'btl',
+    'btl': 'btl',
+    'cans': 'can',
+    'can': 'can',
+    'cartons': 'ctn',
+    'carton': 'ctn',
+    'ctn': 'ctn',
+  };
+
+  const normalized = unitMap[unit.toLowerCase()] || unit;
+  return normalized;
 }
