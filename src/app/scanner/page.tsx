@@ -13,6 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Html5Qrcode } from 'html5-qrcode';
 import OCRScanner from '@/components/OCRScanner';
 import VoiceInput from '@/components/VoiceInput';
+import ConversationalInventoryInput from '@/components/ConversationalInventoryInput';
+import BillUploadModal from '@/components/BillUploadModal';
 
 interface ScannedProduct {
   name: string;
@@ -48,6 +50,8 @@ export default function ScannerPage() {
   const [toasts, setToasts] = useState<Array<{ id: number; content: React.ReactNode }>>([]);
   const [showOCRScanner, setShowOCRScanner] = useState(false);
   const [showVoiceInput, setShowVoiceInput] = useState(false);
+  const [showConversationalInput, setShowConversationalInput] = useState(false);
+  const [showBillUpload, setShowBillUpload] = useState(false);
 
   function addToast(content: React.ReactNode, timeout = 4000) {
     const id = Date.now() + Math.floor(Math.random() * 1000);
@@ -183,6 +187,118 @@ export default function ScannerPage() {
         <div className="flex items-center gap-2">
           <AlertCircle className="w-5 h-5 text-red-600" />
           <span>Error adding product</span>
+        </div>
+      );
+    }
+  };
+
+  // Handle multiple products from conversational input
+  const handleConversationalProductsAdded = async (
+    products: Array<{
+      name: string;
+      quantity: number;
+      unit: string;
+      expiryDate: string;
+    }>
+  ) => {
+    try {
+      const inventoryItems: InventoryItem[] = products.map((product) => {
+        const expiryDate = new Date(product.expiryDate);
+        const today = new Date();
+        const daysUntilExpiry = Math.ceil(
+          (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        return {
+          id: `conv-${Date.now()}-${Math.random()}`,
+          name: product.name,
+          quantity: product.quantity,
+          unit: product.unit,
+          expiryDate: product.expiryDate,
+          category: 'groceries',
+          storageType: 'refrigerator',
+          tags: [],
+          daysUntilExpiry,
+          commonUses: [],
+        };
+      });
+
+      const enhancedData: EnhancedScannedData = {
+        orderId: `conv-${Date.now()}`,
+        orderDate: new Date().toISOString().split('T')[0],
+        products: inventoryItems,
+      };
+
+      setScannedData(enhancedData);
+      setShowConversationalInput(false);
+      addToast(
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+          <span>✓ Added {products.length} products successfully!</span>
+        </div>
+      );
+    } catch (err) {
+      addToast(
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <span>Error adding products from conversation</span>
+        </div>
+      );
+    }
+  };
+
+  // Handle bill upload products
+  const handleBillProductsAdded = async (
+    products: Array<{
+      name: string;
+      quantity: number;
+      unit: string;
+      size: string;
+      expiryDate: string;
+      price?: string;
+    }>
+  ) => {
+    try {
+      const inventoryItems: InventoryItem[] = products.map((product) => {
+        const expiryDate = new Date(product.expiryDate);
+        const today = new Date();
+        const daysUntilExpiry = Math.ceil(
+          (expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        return {
+          id: `bill-${Date.now()}-${Math.random()}`,
+          name: product.name,
+          quantity: product.quantity,
+          unit: product.unit,
+          expiryDate: product.expiryDate,
+          category: 'groceries',
+          storageType: 'refrigerator',
+          tags: [],
+          daysUntilExpiry,
+          commonUses: [],
+        };
+      });
+
+      const enhancedData: EnhancedScannedData = {
+        orderId: `bill-${Date.now()}`,
+        orderDate: new Date().toISOString().split('T')[0],
+        products: inventoryItems,
+      };
+
+      setScannedData(enhancedData);
+      setShowBillUpload(false);
+      addToast(
+        <div className="flex items-center gap-2">
+          <CheckCircle className="w-5 h-5 text-green-600" />
+          <span>✓ Added {products.length} products from bill!</span>
+        </div>
+      );
+    } catch (err) {
+      addToast(
+        <div className="flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <span>Error adding products from bill</span>
         </div>
       );
     }
@@ -742,6 +858,40 @@ export default function ScannerPage() {
                       </div>
                     </motion.button>
 
+                    {/* Conversational Multi-Product Input */}
+                    <motion.button
+                      onClick={() => setShowConversationalInput(true)}
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.96, duration: 0.35, ease: 'easeOut' }}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex flex-col items-center gap-3 p-6 bg-pink-50 border-2 border-pink-500 rounded-2xl hover:bg-pink-100 hover:shadow-lg transition-all"
+                    >
+                      <span className="text-3xl">💬</span>
+                      <div className="text-center">
+                        <h3 className="font-semibold text-pink-700">Batch Add</h3>
+                        <p className="text-xs text-pink-600 mt-1">Multiple products</p>
+                      </div>
+                    </motion.button>
+
+                    {/* Bill Upload */}
+                    <motion.button
+                      onClick={() => setShowBillUpload(true)}
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 1.04, duration: 0.35, ease: 'easeOut' }}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex flex-col items-center gap-3 p-6 bg-yellow-50 border-2 border-yellow-500 rounded-2xl hover:bg-yellow-100 hover:shadow-lg transition-all"
+                    >
+                      <span className="text-3xl">📄</span>
+                      <div className="text-center">
+                        <h3 className="font-semibold text-yellow-700">Bill Upload</h3>
+                        <p className="text-xs text-yellow-600 mt-1">From receipt/invoice</p>
+                      </div>
+                    </motion.button>
+
                     {/* Local Shop Form Entry */}
                     <motion.button
                       onClick={() => setScanMode('form')}
@@ -1141,6 +1291,22 @@ export default function ScannerPage() {
         <VoiceInput 
           onProductDetected={handleVoiceDetection}
           onClose={() => setShowVoiceInput(false)}
+        />
+      )}
+
+      {/* Conversational Multi-Product Input Modal */}
+      {showConversationalInput && (
+        <ConversationalInventoryInput
+          onProductsAdded={handleConversationalProductsAdded}
+          onClose={() => setShowConversationalInput(false)}
+        />
+      )}
+
+      {/* Bill Upload Modal */}
+      {showBillUpload && (
+        <BillUploadModal
+          onProductsAdded={handleBillProductsAdded}
+          onClose={() => setShowBillUpload(false)}
         />
       )}
 

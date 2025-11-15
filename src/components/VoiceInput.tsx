@@ -45,9 +45,9 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState('en-IN');
-  const [useTextInput, setUseTextInput] = useState(false);
+  const [useTextInput, setUseTextInput] = useState(true); // DEFAULT TO TEXT INPUT
   const [manualText, setManualText] = useState('');
-  const [retryCount, setRetryCount] = useState(0);
+  const [voiceAvailable, setVoiceAvailable] = useState(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -94,43 +94,21 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
       const errorCode = errorEvent.error;
       
       console.error('Speech recognition error:', errorCode);
-      
-      let userMessage = '';
-      let shouldRetry = false;
-      
-      switch (errorCode) {
-        case 'network':
-          shouldRetry = retryCount < 2; // Max 2 retries for network errors
-          userMessage = shouldRetry 
-            ? `Network issue detected (attempt ${retryCount + 1}/3). Retrying...`
-            : 'Network error: Unable to connect to speech recognition service. Try again or check your internet connection.';
-          break;
-        case 'audio':
-          userMessage = 'Audio error: Could not access your microphone. Please check permissions.';
-          break;
-        case 'no-speech':
-          userMessage = 'No speech detected. Please speak clearly and try again.';
-          break;
-        case 'not-allowed':
-          userMessage = 'Microphone access denied. Please allow microphone access in browser settings.';
-          break;
-        case 'service-not-allowed':
-          userMessage = 'Speech recognition service is not available in your region.';
-          break;
-        default:
-          userMessage = `Recognition error: ${errorCode}. Please try again.`;
-      }
-      
-      setError(userMessage);
       setIsListening(false);
       
-      // Auto-retry network errors with exponential backoff
-      if (shouldRetry) {
-        const backoffDelay = Math.min(1000 * Math.pow(2, retryCount), 5000);
-        timeoutRef.current = setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-          startListeningInternal();
-        }, backoffDelay);
+      // For any error, disable voice and keep text input active
+      if (errorCode === 'network') {
+        setVoiceAvailable(false);
+        setError('Voice input unavailable (network issue). Using text input instead.');
+      } else if (errorCode === 'no-speech') {
+        setError('No speech detected. Please try again or use text input.');
+      } else if (errorCode === 'audio') {
+        setError('Microphone error. Please check permissions and try text input.');
+      } else if (errorCode === 'not-allowed') {
+        setVoiceAvailable(false);
+        setError('Microphone access denied. Using text input instead.');
+      } else {
+        setError(`Voice error: ${errorCode}. Please use text input.`);
       }
     };
 
@@ -144,7 +122,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       recognition.abort();
     };
-  }, [language, retryCount]);
+  }, [language]);
 
   const startListeningInternal = () => {
     try {
@@ -159,8 +137,6 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setError(null);
     setTranscript('');
-    setRetryCount(0);
-    setUseTextInput(false);
     startListeningInternal();
   };
 
@@ -212,13 +188,11 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
     }
   };
 
-  const displayTranscript = transcript.split('|')[0];
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-md w-full p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold">Add Item by Voice</h2>
+          <h2 className="text-xl text-gray-900 font-bold">Add Item</h2>
           <button
             onClick={onClose}
             className="p-1 hover:bg-gray-100 rounded"
@@ -228,83 +202,12 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
         </div>
 
         <div className="space-y-4">
-          {/* Language selector */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                if (useTextInput) return;
-                setLanguage('en-IN');
-                setTranscript('');
-              }}
-              className={`flex-1 py-2 rounded font-medium transition ${
-                language === 'en-IN' && !useTextInput
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-              }`}
-              disabled={useTextInput}
-            >
-              English
-            </button>
-            <button
-              onClick={() => {
-                if (useTextInput) return;
-                setLanguage('hi-IN');
-                setTranscript('');
-              }}
-              className={`flex-1 py-2 rounded font-medium transition ${
-                language === 'hi-IN' && !useTextInput
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-              }`}
-              disabled={useTextInput}
-            >
-              हिंदी
-            </button>
-            <button
-              onClick={() => {
-                setUseTextInput(!useTextInput);
-                setError(null);
-                setTranscript('');
-                setManualText('');
-              }}
-              className={`flex-1 py-2 rounded font-medium transition ${
-                useTextInput
-                  ? 'bg-amber-600 text-white'
-                  : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-              }`}
-              title="Use text input if speech recognition isn't working"
-            >
-              ⌨️ Type
-            </button>
-          </div>
-
-          {/* Microphone button or Text input */}
-          {!useTextInput ? (
-            <button
-              onClick={isListening ? stopListening : startListening}
-              disabled={isProcessing}
-              className={`w-full py-6 rounded-lg font-medium flex items-center justify-center gap-2 transition text-lg ${
-                isListening
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
-              } disabled:opacity-50`}
-            >
-              {isListening ? (
-                <>
-                  <MicOff size={24} />
-                  Stop Recording
-                </>
-              ) : (
-                <>
-                  <Mic size={24} />
-                  Start Listening
-                </>
-              )}
-            </button>
-          ) : (
+          {/* Primary text input - ALWAYS VISIBLE */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Product Details</label>
             <input
               type="text"
-              placeholder="Type product name and expiry, e.g., milk expiring Dec 15"
+              placeholder="e.g., milk expiring Dec 15"
               value={manualText}
               onChange={(e) => setManualText(e.target.value)}
               onKeyPress={(e) => {
@@ -313,89 +216,121 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
                 }
               }}
               disabled={isProcessing}
-              className="w-full py-3 px-4 border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 text-gray-800 placeholder-gray-500"
+              className="w-full py-3 px-4 border-2 border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-800 placeholder-gray-500"
               autoFocus
             />
-          )}
-
-          {/* Transcript display */}
-          {!useTextInput && displayTranscript && (
-            <div className="bg-gray-50 rounded-lg p-4 min-h-20">
-              <p className="text-sm text-gray-600 mb-2">You said:</p>
-              <p className="text-gray-800">{displayTranscript}</p>
-            </div>
-          )}
-
-          {/* Examples */}
-          <div className="bg-blue-50 rounded-lg p-4">
-            <p className="text-sm font-medium text-blue-900 mb-2">Examples:</p>
-            <ul className="text-xs text-blue-800 space-y-1">
-              <li>✓ "Add milk expiring December 15"</li>
-              <li>✓ "Add 2 liters butter milk valid till next week"</li>
-              <li>✓ "Yogurt packet expires on the 10th"</li>
-              <li>✓ "500g flour expiring next month"</li>
-            </ul>
+            <p className="text-xs text-gray-500 mt-1">Format: "product name expiring date" or "product name expires DD-MM-YYYY"</p>
           </div>
 
-          {/* Error display */}
-          {error && (
-            <div className="bg-red-50 rounded-lg p-4 border border-red-200">
-              <p className="text-sm text-red-700 font-medium mb-3">{error}</p>
-              {error.includes('Network error') && !useTextInput && (
-                <div className="text-xs text-red-600 space-y-2">
-                  <p>💡 Troubleshooting tips:</p>
-                  <ul className="list-disc list-inside">
-                    <li>Check your internet connection</li>
-                    <li>Wait a moment and try again</li>
-                    <li>Try using a different browser (Chrome works best)</li>
-                    <li>Click the <strong>⌨️ Type</strong> button above to use text input instead</li>
-                  </ul>
+          {/* Voice input - OPTIONAL */}
+          {voiceAvailable && (
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Or use voice (optional):</p>
+              <div className="flex gap-2 mb-3">
+                <button
+                  onClick={() => {
+                    setLanguage('en-IN');
+                    setTranscript('');
+                  }}
+                  className={`flex-1 py-2 rounded text-sm font-medium transition ${
+                    language === 'en-IN'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                  disabled={isProcessing}
+                >
+                  English
+                </button>
+                <button
+                  onClick={() => {
+                    setLanguage('hi-IN');
+                    setTranscript('');
+                  }}
+                  className={`flex-1 py-2 rounded text-sm font-medium transition ${
+                    language === 'hi-IN'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                  }`}
+                  disabled={isProcessing}
+                >
+                  हिंदी
+                </button>
+              </div>
+              
+              <button
+                onClick={isListening ? stopListening : startListening}
+                disabled={isProcessing}
+                className={`w-full py-3 rounded-lg font-medium flex items-center justify-center gap-2 transition ${
+                  isListening
+                    ? 'bg-red-600 hover:bg-red-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
+                } disabled:opacity-50`}
+              >
+                {isListening ? (
+                  <>
+                    <MicOff size={20} />
+                    Stop Recording
+                  </>
+                ) : (
+                  <>
+                    <Mic size={20} />
+                    Start Listening
+                  </>
+                )}
+              </button>
+
+              {/* Transcript display */}
+              {transcript && (
+                <div className="bg-gray-50 rounded-lg p-3 mt-3">
+                  <p className="text-xs text-gray-600 mb-1">You said:</p>
+                  <p className="text-gray-800 text-sm">{transcript}</p>
                 </div>
               )}
             </div>
           )}
 
+          {/* Error display */}
+          {error && (
+            <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+              <p className="text-sm text-amber-800">{error}</p>
+            </div>
+          )}
+
           {/* Processing state */}
           {isProcessing && (
-            <div className="bg-blue-50 rounded-lg p-4 flex items-center gap-2">
-              <Loader2 className="animate-spin" size={20} />
+            <div className="bg-blue-50 rounded-lg p-3 flex items-center gap-2">
+              <Loader2 className="animate-spin" size={16} />
               <p className="text-sm text-blue-600">Processing...</p>
             </div>
           )}
 
           {/* Action buttons */}
-          {((useTextInput && manualText) || (!useTextInput && displayTranscript)) && !isProcessing && (
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => {
-                  setTranscript('');
-                  startListening();
-                }}
-                className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg font-medium hover:bg-gray-400 transition"
-              >
-                Retry
-              </button>
-              <button
-                onClick={processTranscript}
-                className="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition"
-              >
-                Confirm
-              </button>
-            </div>
-          )}
-
-          {/* Retry button for network errors */}
-          {error && !displayTranscript && !isListening && (
+          <div className="flex gap-2 pt-2">
             <button
-              onClick={() => {
-                setError(null);
-                startListening();
-              }}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 transition"
+              onClick={onClose}
+              className="flex-1 bg-gray-300 text-gray-800 py-2 rounded-lg font-medium hover:bg-gray-400 transition"
             >
-              Retry Recording
+              Cancel
             </button>
-          )}
+            <button
+              onClick={processTranscript}
+              disabled={!manualText.trim() || isProcessing}
+              className="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition disabled:opacity-50"
+            >
+              Confirm
+            </button>
+          </div>
+
+          {/* Examples */}
+          <div className="bg-blue-50 rounded-lg p-3">
+            <p className="text-xs font-medium text-blue-900 mb-2">Examples:</p>
+            <ul className="text-xs text-blue-800 space-y-1">
+              <li>✓ "milk expiring December 15"</li>
+              <li>✓ "butter milk expires 15-12-2025"</li>
+              <li>✓ "500g yogurt valid till tomorrow"</li>
+              <li>✓ "flour expiring next month"</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

@@ -20,6 +20,14 @@ interface VoiceProcessingResult {
   confidence: number;
 }
 
+interface BillProduct {
+  productName: string;
+  quantity: string;
+  unit: string;
+  size: string;
+  price?: string;
+}
+
 /**
  * Initialize Gemini API with your API key
  * Store API key in environment variable: NEXT_PUBLIC_GEMINI_API_KEY
@@ -71,7 +79,7 @@ export async function extractExpiryFromImage(
                   
 Please analyze this product image and extract the following information:
 1. **Expiry Date** (Look for: "Expiry Date", "Best Before", "Use By", "Expires On", "EXP:", "EXP", "Exp.", "Validity")
-2. **Product Name** (Brand and product type)
+2. **Product Name** (IMPORTANT: Extract the COMPLETE product name including BRAND NAME + PRODUCT TYPE. Examples: "Fabsta Corn Flakes", "Good Day Biscuits", "Maggi Noodles". Do NOT extract just one word - find the main brand/product combination visible on the front label)
 3. **Batch/Lot Number** (Look for: "Batch", "Lot", "B/C")
 4. **Manufacturing Date** (Look for: "Mfg Date", "Manufactured On", "Date of Mfg", "MFD")
 
@@ -80,11 +88,12 @@ Important formatting rules:
 - If only month/year is visible, assume the last day of that month
 - For Indian packaging: Look for "Exp" followed by date
 - Common patterns: 01/06/2025, 01-06-2025, June 2025, 06/2025
+- For product names: Capture the full visible name (brand + category), not just the first word
 
 Return ONLY a JSON object with this exact structure:
 {
   "expiryDate": "DD-MM-YYYY or null if not found",
-  "productName": "product name or null",
+  "productName": "full brand + product name",
   "batchNumber": "batch number or null",
   "manufacturingDate": "DD-MM-YYYY or null",
   "rawText": "all visible text on the label",
@@ -328,3 +337,290 @@ Focus on:
     return [];
   }
 }
+
+/**
+ * Extract product details from conversational speech input
+ * Used for multi-turn inventory input where user speaks product name, quantity, and expiry
+ */
+export async function extractProductDetailsFromSpeech(
+  userInput: string
+): Promise<{
+  productName: string | null;
+  quantity: string | null;
+  unit: string | null;
+  expiryDate: string | null;
+  confidence: number;
+}> {
+  try {
+    const apiKey = getGeminiApiKey();
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `You are an expert at parsing natural language product inventory information spoken by users.
+
+Analyze this user input and extract product details:
+"${userInput}"
+
+Extract the following information if present:
+1. **Product Name** - The brand and product type (e.g., "Fortune Biryani Rice", "Good Day Biscuits")
+2. **Quantity** - The numeric amount (e.g., "1", "5", "10")
+3. **Unit** - The unit of measurement (e.g., "kg", "liter", "pieces", "boxes", "packets")
+4. **Expiry Date** - The expiration date in any format (e.g., "29 06 2026", "29-06-2026", "June 2026")
+
+Return ONLY a JSON object with this exact structure:
+{
+  "productName": "extracted product name or null",
+  "quantity": "extracted quantity number or null",
+  "unit": "extracted unit or null",
+  "expiryDate": "extracted date in DD-MM-YYYY format or null",
+  "confidence": 0.95,
+  "notes": "any observations about the input"
+}
+
+Important rules:
+- Convert dates to DD-MM-YYYY format (e.g., "29 06 2026" → "29-06-2026")
+- For dates like "June 2026", use the last day of month: "30-06-2026"
+- Extract ONLY what is mentioned, set others to null
+- Confidence: 1.0 = all fields found, 0.5 = some fields found, 0.3 = very unclear
+- If expiry date is incomplete (e.g., "29th"), ask for clarification in notes`,
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!content) {
+      throw new Error('No response from Gemini API');
+    }
+
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response');
+    }
+
+    const parsedResult = JSON.parse(jsonMatch[0]);
+
+    return {
+      productName: parsedResult.productName || null,
+      quantity: parsedResult.quantity || null,
+      unit: parsedResult.unit || null,
+      expiryDate: parsedResult.expiryDate || null,
+      confidence: parsedResult.confidence || 0.5,
+    };
+  } catch (error) {
+    console.error('Error extracting product details from speech:', error);
+    return {
+      productName: null,
+      quantity: null,
+      unit: null,
+      expiryDate: null,
+      confidence: 0,
+    };
+  }
+}
+
+/**
+ * Extract products from bill/receipt image or PDF
+ * Used for bill upload feature - extracts all line items with quantity, size, price
+ */
+export async function extractProductsFromBill(
+  imageBase64: string,
+  fileType: 'image' | 'pdf' = 'image'
+): Promise<BillProduct[]> {
+  try {
+    const apiKey = getGeminiApiKey();
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `You are an expert at reading bills, receipts, and invoices.
+
+Extract ALL products/line items from this bill/receipt. For each product, extract:
+1. Product Name - The full product name/description as shown on bill
+2. Quantity - The numeric quantity (e.g., "1", "5", "10")
+3. Unit - Unit of measurement (boxes, packets, kg, liters, pieces, etc.)
+4. Size - The size/weight mentioned (e.g., "250g", "1L", "500ml"). If not mentioned, use "1"
+5. Price - Price per unit if visible, else null
+
+Important rules:
+- Extract product names EXACTLY as they appear on bill (keep brand + product type)
+- If bill has abbreviated names, use the full form if visible
+- Quantity: Extract only the number before unit
+- Size: Extract weight/volume mentioned on product line
+- DO NOT merge products - if same product appears twice, list as separate rows
+- Include ALL visible line items
+
+Return ONLY a JSON array:
+[
+  {
+    "productName": "exact name from bill",
+    "quantity": "number",
+    "unit": "boxes/packets/kg/liters/etc",
+    "size": "weight or volume",
+    "price": "price or null"
+  }
+]
+
+Example format for Indian bills:
+[
+  {
+    "productName": "Fabsta Corn Flakes",
+    "quantity": "1",
+    "unit": "box",
+    "size": "250g",
+    "price": "120"
+  },
+  {
+    "productName": "Amul Milk",
+    "quantity": "2",
+    "unit": "liters",
+    "size": "1L",
+    "price": "60"
+  }
+]`,
+                },
+                {
+                  inlineData: {
+                    mimeType: fileType === 'pdf' ? 'application/pdf' : 'image/jpeg',
+                    data: imageBase64,
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!content) {
+      throw new Error('No response from Gemini API');
+    }
+
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response');
+    }
+
+    const products = JSON.parse(jsonMatch[0]) as BillProduct[];
+    return products;
+  } catch (error) {
+    console.error('Error extracting products from bill:', error);
+    return [];
+  }
+}
+
+/**
+ * Parse natural language date input and convert to DD-MM-YYYY format
+ * Supports: "tomorrow", "next week", "29 06 2026", "June 2026", etc.
+ */
+export async function parseNaturalLanguageDate(dateInput: string): Promise<string | null> {
+  try {
+    const apiKey = getGeminiApiKey();
+
+    const today = new Date();
+    const todayStr = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `Convert this natural language date input to DD-MM-YYYY format.
+
+Today's date is: ${todayStr}
+
+User input: "${dateInput}"
+
+Rules:
+- "tomorrow" → tomorrow's date in DD-MM-YYYY
+- "next week" → 7 days from today in DD-MM-YYYY
+- "in 2 weeks" → 14 days from today
+- "in 6 months" → 6 months from today
+- "29 06 2026" → "29-06-2026"
+- "June 2026" → "30-06-2026" (last day of month)
+- "29-06-2026" → "29-06-2026"
+- "06/29/2026" → "29-06-2026"
+- Any specific date format → convert to DD-MM-YYYY
+
+Return ONLY the date in DD-MM-YYYY format. No explanation.
+Example output: "29-06-2026"
+
+If you cannot parse the date, return "INVALID"`,
+                },
+              ],
+            },
+          ],
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Gemini API error: ${error.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    if (!content || content === 'INVALID') {
+      return null;
+    }
+
+    // Validate date format
+    const dateRegex = /\d{1,2}-\d{1,2}-\d{4}/;
+    if (dateRegex.test(content)) {
+      return content;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error parsing natural language date:', error);
+    return null;
+  }
+}
+
+export type { BillProduct };
