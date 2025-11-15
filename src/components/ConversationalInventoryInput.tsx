@@ -283,6 +283,7 @@ export default function ConversationalInventoryInput({
       else if (currentField === 'name') {
         // Try to parse all product details from the input
         const parsed = parseProductDetails(text);
+        console.log('[parseProductDetails] Result:', { name: parsed.name, qty: parsed.quantity, unit: parsed.unit, expiry: parsed.expiryDate });
         
         if (parsed.name) {
           setCurrentProductData(prev => ({ ...prev, name: parsed.name || '' }));
@@ -293,10 +294,12 @@ export default function ConversationalInventoryInput({
             
             // If user also provided unit, move to expiry
             if (parsed.unit) {
+              console.log('[SMART PARSE] Has unit:', parsed.unit, '- checking for expiry');
               setCurrentProductData(prev => ({ ...prev, name: parsed.name || '', quantity: parsed.quantity || '', unit: parsed.unit || '' }));
               
               // If user also provided expiry date, complete the product!
               if (parsed.expiryDate) {
+                console.log('[SMART PARSE] Has expiry:', parsed.expiryDate, '- completing product');
                 setCurrentProductData(prev => ({ ...prev, name: parsed.name || '', quantity: parsed.quantity || '', unit: parsed.unit || '', expiryDate: parsed.expiryDate || '' }));
                 // All details provided, complete product
                 const completedProduct: PendingProduct = {
@@ -325,11 +328,13 @@ export default function ConversationalInventoryInput({
                 addAIMessage(getMessage('invalidCommand'));
               } else {
                 // Have name, qty, unit - ask for expiry
+                console.log('[SMART PARSE] No expiry provided - asking for it');
                 setCurrentField('expiry');
                 addAIMessage(getMessage('expiryQuestion'));
               }
             } else {
               // Have name and qty - ask for unit
+              console.log('[SMART PARSE] No unit provided - asking for it');
               setCurrentField('unit');
               addAIMessage(getMessage('quantityQuestion', { qty: parsed.quantity }));
             }
@@ -410,6 +415,7 @@ export default function ConversationalInventoryInput({
             setCurrentProductIndex(nextIndex);
             setCurrentField('name');
             setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
+            console.log('[NEXT] Moving to product', nextIndex, '- set currentField to name');
             addAIMessage(getMessage('nextProduct', { nextIndex }));
           } else {
             // All products added
