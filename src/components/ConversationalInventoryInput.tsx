@@ -106,7 +106,7 @@ export default function ConversationalInventoryInput({
         if (newErrorCount <= 2) {
           // Retry after delay (exponential backoff: 1s, 2s)
           const delayMs = newErrorCount === 1 ? 1000 : 2000;
-          addAIMessage(`Network issue. Retrying in ${delayMs / 1000} seconds...`);
+          addAIMessage(getMessage('networkRetry', { delay: delayMs / 1000 }));
           
           retryTimeoutRef.current = setTimeout(() => {
             if (recognitionRef.current && !voiceDisabled) {
@@ -117,16 +117,14 @@ export default function ConversationalInventoryInput({
           // Give up on voice, switch to text mode
           setVoiceDisabled(true);
           setNetworkErrorCount(0);
-          addAIMessage(
-            '⌨️ Voice input is having trouble connecting. Switching to text mode. Please type instead (you can still use the mic button if you want to retry).'
-          );
+          addAIMessage(getMessage('voiceDisabled'));
         }
       } else if (event.error === 'no-speech') {
-        addAIMessage('No speech detected. Please try again.');
+        addAIMessage(getMessage('noSpeech'));
       } else if (event.error === 'audio-capture') {
-        addAIMessage('Microphone not available. Please check permissions.');
+        addAIMessage(getMessage('micNotAvailable'));
       } else {
-        addAIMessage(`Error: ${event.error}. Please try typing instead.`);
+        addAIMessage(getMessage('error', { error: event.error }));
       }
     };
   }, [language]);
@@ -138,6 +136,25 @@ export default function ConversationalInventoryInput({
       startConversation();
     }
   }, []);
+
+  // Reset conversation when language changes
+  useEffect(() => {
+    if (initializedRef.current) {
+      setConversation([]);
+      setProducts([]);
+      setCurrentProductIndex(0);
+      setTotalProducts(0);
+      setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
+      setCurrentField(null);
+      initializedRef.current = false;
+      // Restart conversation in new language
+      setTimeout(() => {
+        initializedRef.current = false;
+        setConversation([]);
+        startConversation();
+      }, 100);
+    }
+  }, [language]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -171,8 +188,53 @@ export default function ConversationalInventoryInput({
     speakText(text);
   };
 
+  // Translation helper
+  const getMessage = (key: string, params?: Record<string, any>): string => {
+    const messages: Record<string, Record<string, string>> = {
+      en: {
+        greeting: "Hello! I'll help you add products to your inventory. How many products would you like to add today?",
+        perfect: `Perfect! I'll help you add ${params?.count} products. Let's start with product 1. What is the product name?`,
+        countError: "I didn't catch that. Please tell me how many products (e.g., 'I have 3 products' or just '3')",
+        nameConfirm: `Got it - ${params?.name}. What's the quantity? (e.g., '2' or '500')`,
+        quantityQuestion: `${params?.qty} what? (e.g., 'kg', 'liters', 'packets', 'boxes')`,
+        quantityError: `I didn't get that. Please tell me the quantity as a number (e.g., '2' for 2 kg)`,
+        unitQuestion: `Great! Now, what's the expiry date? (e.g., '29 06 2026' or 'December 25')`,
+        productAdded: `✓ Added ${params?.qty} ${params?.unit} of ${params?.name} expiring on ${params?.expiry}. Say "next" or "confirm" to add the next product, or "done" if finished.`,
+        nextProduct: `Great! Now let's add product ${params?.nextIndex}. What is the product name?`,
+        allAdded: "Perfect! All products have been added. Submitting your inventory...",
+        invalidCommand: "Please say 'next' or 'confirm' to add another product, or 'done' if you're finished.",
+        networkRetry: `Network issue. Retrying in ${params?.delay} seconds...`,
+        noSpeech: "No speech detected. Please try again.",
+        micNotAvailable: "Microphone not available. Please check permissions.",
+        error: `Error: ${params?.error}. Please try typing instead.`,
+        voiceDisabled: "⌨️ Voice input is having trouble connecting. Switching to text mode. Please type instead (you can still use the mic button if you want to retry).",
+      },
+      hi: {
+        greeting: "नमस्ते! मैं आपको आपके इन्वेंटरी में प्रोडक्ट जोड़ने में मदद करूंगा। आप आज कितने प्रोडक्ट जोड़ना चाहते हैं?",
+        perfect: `बहुत अच्छा! मैं आपको ${params?.count} प्रोडक्ट जोड़ने में मदद करूंगा। आइए प्रोडक्ट 1 से शुरू करते हैं। प्रोडक्ट का नाम क्या है?`,
+        countError: "मुझे समझ नहीं आया। कृपया बताएं कि आप कितने प्रोडक्ट जोड़ना चाहते हैं (जैसे 'मेरे पास 3 प्रोडक्ट हैं' या बस '3')",
+        nameConfirm: `ठीक है - ${params?.name}। मात्रा क्या है? (जैसे '2' या '500')`,
+        quantityQuestion: `${params?.qty} क्या? (जैसे 'किलो', 'लीटर', 'पैकेट', 'डिब्बे')`,
+        quantityError: `मुझे समझ नहीं आया। कृपया मात्रा बताएं (जैसे '2' किलो के लिए)`,
+        unitQuestion: `शानदार! अब एक्सपायरी तारीख क्या है? (जैसे '29 06 2026' या 'दिसंबर 25')`,
+        productAdded: `✓ ${params?.qty} ${params?.unit} ${params?.name} जोड़ा गया, एक्सपायरी ${params?.expiry} को है। "अगला" या "पुष्टि" कहें अगला प्रोडक्ट जोड़ने के लिए, या "हो गया" अगर समाप्त।`,
+        nextProduct: `शानदार! अब प्रोडक्ट ${params?.nextIndex} जोड़ते हैं। प्रोडक्ट का नाम क्या है?`,
+        allAdded: "बहुत अच्छा! सभी प्रोडक्ट जोड़ दिए गए हैं। आपकी इन्वेंटरी सबमिट की जा रही है...",
+        invalidCommand: "'अगला' या 'पुष्टि' कहें अगला प्रोडक्ट जोड़ने के लिए, या 'हो गया' अगर आप पूरा कर चुके हैं।",
+        networkRetry: `नेटवर्क समस्या। ${params?.delay} सेकंड में दोबारा कोशिश की जा रही है...`,
+        noSpeech: "कोई आवाज़ नहीं सुनाई दी। कृपया दोबारा कोशिश करें।",
+        micNotAvailable: "माइक्रोफोन उपलब्ध नहीं है। कृपया अनुमतियां जांचें।",
+        error: `त्रुटि: ${params?.error}। कृपया टाइप करने की कोशिश करें।`,
+        voiceDisabled: "⌨️ वॉयस इनपुट में समस्या आ रही है। टेक्स्ट मोड में स्विच किया जा रहा है। कृपया टाइप करें (आप माइक बटन से दोबारा कोशिश कर सकते हैं)।",
+      },
+    };
+
+    const lang = language === 'hi-IN' ? 'hi' : 'en';
+    return messages[lang]?.[key] || messages.en[key] || '';
+  };
+
   const startConversation = () => {
-    const greeting = "Hello! I'll help you add products to your inventory. How many products would you like to add today?";
+    const greeting = getMessage('greeting');
     addAIMessage(greeting);
     setCurrentField('count');
   };
@@ -192,11 +254,9 @@ export default function ConversationalInventoryInput({
           setCurrentProductIndex(1);
           setCurrentField('name');
           setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
-          addAIMessage(
-            `Perfect! I'll help you add ${count} products. Let's start with product 1. What is the product name?`
-          );
+          addAIMessage(getMessage('perfect', { count }));
         } else {
-          addAIMessage("I didn't catch that. Please tell me how many products (e.g., 'I have 3 products' or just '3')");
+          addAIMessage(getMessage('countError'));
         }
       }
       // STEP 2: Get product name
@@ -204,7 +264,7 @@ export default function ConversationalInventoryInput({
         // Just use the text as product name
         setCurrentProductData(prev => ({ ...prev, name: text.trim() }));
         setCurrentField('quantity');
-        addAIMessage(`Got it - ${text.trim()}. What's the quantity? (e.g., '2' or '500')`);
+        addAIMessage(getMessage('nameConfirm', { name: text.trim() }));
       }
       // STEP 3: Get quantity
       else if (currentField === 'quantity') {
@@ -212,9 +272,9 @@ export default function ConversationalInventoryInput({
         if (qty) {
           setCurrentProductData(prev => ({ ...prev, quantity: qty }));
           setCurrentField('unit');
-          addAIMessage(`${qty} what? (e.g., 'kg', 'liters', 'packets', 'boxes')`);
+          addAIMessage(getMessage('quantityQuestion', { qty }));
         } else {
-          addAIMessage(`I didn't get that. Please tell me the quantity as a number (e.g., '2' for 2 kg)`);
+          addAIMessage(getMessage('quantityError'));
         }
       }
       // STEP 4: Get unit
@@ -223,7 +283,7 @@ export default function ConversationalInventoryInput({
         const detectedUnit = units.find(u => text.toLowerCase().includes(u)) || text.trim();
         setCurrentProductData(prev => ({ ...prev, unit: detectedUnit }));
         setCurrentField('expiry');
-        addAIMessage(`Great! Now, what's the expiry date? (e.g., '29 06 2026' or 'December 25')`);
+        addAIMessage(getMessage('unitQuestion'));
       }
       // STEP 5: Get expiry date
       else if (currentField === 'expiry') {
@@ -238,7 +298,12 @@ export default function ConversationalInventoryInput({
 
         setProducts(prev => [...prev, completedProduct]);
         addAIMessage(
-          `✓ Added ${completedProduct.quantity} ${completedProduct.unit} of ${completedProduct.name} expiring on ${expiryDate}. Say "next" or "confirm" to add the next product, or "done" if finished.`
+          getMessage('productAdded', {
+            qty: completedProduct.quantity,
+            unit: completedProduct.unit,
+            name: completedProduct.name,
+            expiry: expiryDate,
+          })
         );
         
         // CRITICAL FIX: Set currentField to null so we can handle next/confirm/done
@@ -250,18 +315,20 @@ export default function ConversationalInventoryInput({
       // STEP 6: Handle next/confirm/done commands when waiting for confirmation
       else if (currentField === null && products.length > 0) {
         const lowerText = text.toLowerCase().trim();
+        const isNext = lowerText.includes('next') || lowerText.includes('confirm') || lowerText.includes('अगला') || lowerText.includes('पुष्टि');
+        const isDone = lowerText.includes('done') || lowerText.includes('हो गया') || lowerText.includes('तैयार');
         
-        if (lowerText.includes('next') || lowerText.includes('confirm')) {
+        if (isNext) {
           // Move to next product
           if (currentProductIndex < totalProducts) {
             const nextIndex = currentProductIndex + 1;
             setCurrentProductIndex(nextIndex);
             setCurrentField('name');
             setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
-            addAIMessage(`Great! Now let's add product ${nextIndex}. What is the product name?`);
+            addAIMessage(getMessage('nextProduct', { nextIndex }));
           } else {
             // All products added
-            addAIMessage('Perfect! All products have been added. Submitting your inventory...');
+            addAIMessage(getMessage('allAdded'));
             setCurrentField(null);
             onProductsAdded(
               products.map(p => ({
@@ -273,9 +340,9 @@ export default function ConversationalInventoryInput({
             );
             setTimeout(() => onClose(), 2000);
           }
-        } else if (lowerText.includes('done')) {
+        } else if (isDone) {
           // User finished adding products
-          addAIMessage('Perfect! All products have been added. Submitting your inventory...');
+          addAIMessage(getMessage('allAdded'));
           setCurrentField(null);
           onProductsAdded(
             products.map(p => ({
@@ -287,12 +354,12 @@ export default function ConversationalInventoryInput({
           );
           setTimeout(() => onClose(), 2000);
         } else {
-          addAIMessage("Please say 'next' or 'confirm' to add another product, or 'done' if you're finished.");
+          addAIMessage(getMessage('invalidCommand'));
         }
       }
     } catch (error) {
       console.error('Error processing input:', error);
-      addAIMessage('Error processing your input. Please try again.');
+      addAIMessage(getMessage('error', { error: String(error) }));
     } finally {
       setIsProcessing(false);
     }
