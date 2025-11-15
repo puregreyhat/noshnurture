@@ -793,6 +793,13 @@ function convertRelativeDate(dateStr: string): string {
     return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
   };
   
+  // Check "day after tomorrow" BEFORE "tomorrow" (order matters!)
+  if (lowerStr.includes('day after tomorrow')) {
+    const dayAfterTomorrow = new Date(today);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+    return formatDate(dayAfterTomorrow);
+  }
+  
   if (lowerStr.includes('tomorrow')) {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -814,7 +821,7 @@ function convertRelativeDate(dateStr: string): string {
     return formatDate(nextYear);
   }
   
-  if (lowerStr.includes('after a month') || lowerStr.includes('a month') || lowerStr.includes('one month')) {
+  if (lowerStr.includes('after a month') || lowerStr.includes('a month') || lowerStr.includes('one month') || lowerStr.includes('month from now')) {
     const nextMonthDate = new Date(today);
     nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
     return formatDate(nextMonthDate);
@@ -871,9 +878,9 @@ function parseProductDetails(text: string): {
   }
   
   // Step 3: Extract date info (look for month/year/date keywords AFTER the quantity)
-  const dateKeywords = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december',
+  const dateKeywords = ['day after tomorrow', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december',
                         'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
-                        'tomorrow', 'next month', 'next year', 'after a year', 'after a month'];
+                        'tomorrow', 'today', 'next month', 'next year', 'a month from now', 'month from now', 'after a year', 'after a month', 'a year', 'a month'];
   
   let dateStartIndex = -1;
   for (const keyword of dateKeywords) {
