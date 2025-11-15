@@ -237,13 +237,7 @@ export default function ConversationalInventoryInput({
     const greeting = getMessage('greeting');
     addAIMessage(greeting);
     setCurrentField('count');
-    
-    // Auto-start voice recognition after greeting is spoken (with delay to avoid self-detection)
-    setTimeout(() => {
-      if (recognitionRef.current && !voiceDisabled) {
-        recognitionRef.current.start();
-      }
-    }, 2500); // Wait 2.5s for greeting to finish speaking before listening
+    // User will manually start listening by clicking the mic button
   };
 
   const handleUserInput = async (text: string) => {
@@ -404,11 +398,6 @@ export default function ConversationalInventoryInput({
 
   const speakText = (text: string) => {
     if ('speechSynthesis' in window) {
-      // Stop listening while speaking to avoid self-detection
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate = 0.9;
       utterance.pitch = 1;
@@ -429,15 +418,6 @@ export default function ConversationalInventoryInput({
           return;
         }
       }
-
-      // Resume listening after speech ends
-      utterance.onend = () => {
-        if (recognitionRef.current && !voiceDisabled && currentField) {
-          setTimeout(() => {
-            recognitionRef.current.start();
-          }, 500); // Wait 500ms after speech ends before listening again
-        }
-      };
       
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
@@ -451,16 +431,6 @@ export default function ConversationalInventoryInput({
       const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=${lang}&client=tw-ob`;
       
       const audio = new Audio(audioUrl);
-      
-      // Resume listening after audio ends
-      audio.onended = () => {
-        if (recognitionRef.current && !voiceDisabled && currentField) {
-          setTimeout(() => {
-            recognitionRef.current.start();
-          }, 500); // Wait 500ms after audio ends before listening again
-        }
-      };
-
       audio.play().catch(err => console.log('Google TTS play error:', err));
     } catch (error) {
       console.log('Google TTS fallback failed, using system TTS');
