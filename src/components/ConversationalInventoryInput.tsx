@@ -210,7 +210,7 @@ export default function ConversationalInventoryInput({
   const getMessage = (key: string, params?: Record<string, any>): string => {
     const messages: Record<string, Record<string, string>> = {
       en: {
-        greeting: "Hello! I'll help you add products to your inventory. How many products would you like to add today?",
+        greeting: "Hello! How many products would you like to add today?",
         perfect: `Perfect! I'll help you add ${params?.count} products. Let's start with product 1. What is the product name?`,
         countError: "I didn't catch that. Please tell me how many products (e.g., 'I have 3 products' or just '3')",
         nameConfirm: `Got it - ${params?.name}. What's the quantity? (e.g., '2 kg' or '255 grams')`,
@@ -279,12 +279,67 @@ export default function ConversationalInventoryInput({
           addAIMessage(getMessage('countError'));
         }
       }
-      // STEP 2: Get product name
+      // STEP 2: Get product name (and extract other details if provided)
       else if (currentField === 'name') {
-        // Just use the text as product name
-        setCurrentProductData(prev => ({ ...prev, name: text.trim() }));
-        setCurrentField('quantity');
-        addAIMessage(getMessage('nameConfirm', { name: text.trim() }));
+        // Try to parse all product details from the input
+        const parsed = parseProductDetails(text);
+        
+        if (parsed.name) {
+          setCurrentProductData(prev => ({ ...prev, name: parsed.name || '' }));
+          
+          // If user provided quantity too, move to next step
+          if (parsed.quantity) {
+            setCurrentProductData(prev => ({ ...prev, name: parsed.name || '', quantity: parsed.quantity || '' }));
+            
+            // If user also provided unit, move to expiry
+            if (parsed.unit) {
+              setCurrentProductData(prev => ({ ...prev, name: parsed.name || '', quantity: parsed.quantity || '', unit: parsed.unit || '' }));
+              
+              // If user also provided expiry date, complete the product!
+              if (parsed.expiryDate) {
+                setCurrentProductData(prev => ({ ...prev, name: parsed.name || '', quantity: parsed.quantity || '', unit: parsed.unit || '', expiryDate: parsed.expiryDate || '' }));
+                // All details provided, complete product
+                const completedProduct: PendingProduct = {
+                  name: parsed.name || '',
+                  quantity: parsed.quantity || '',
+                  unit: parsed.unit || '',
+                  expiryDate: parsed.expiryDate || '',
+                };
+                
+                setProducts(prev => [...prev, completedProduct]);
+                const normalizedQty = normalizeQuantity(completedProduct.quantity);
+                const normalizedUnit = abbreviateUnit(completedProduct.unit);
+                
+                addAIMessage(
+                  getMessage('productAdded', {
+                    qty: normalizedQty,
+                    unit: normalizedUnit,
+                    name: completedProduct.name,
+                    expiry: parsed.expiryDate,
+                  })
+                );
+                
+                setCurrentField(null);
+                setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
+              } else {
+                // Have name, qty, unit - ask for expiry
+                setCurrentField('expiry');
+                addAIMessage(getMessage('unitQuestion'));
+              }
+            } else {
+              // Have name and qty - ask for unit
+              setCurrentField('unit');
+              addAIMessage(getMessage('quantityQuestion', { qty: parsed.quantity }));
+            }
+          } else {
+            // Only have name - ask for quantity
+            setCurrentField('quantity');
+            addAIMessage(getMessage('nameConfirm', { name: parsed.name }));
+          }
+        } else {
+          // Invalid input
+          addAIMessage(getMessage('countError'));
+        }
       }
       // STEP 3: Get quantity
       else if (currentField === 'quantity') {
@@ -692,3 +747,77 @@ function abbreviateUnit(unit: string): string {
   const normalized = unitMap[unit.toLowerCase()] || unit;
   return normalized;
 }
+
+// Parse complete product details from a single line
+// Returns object with: name, quantity, unit, expiryDate (or null for missing fields)
+function parseProductDetails(text: string): {
+  name: string | null;
+  quantity: string | null;
+  unit: string | null;
+  expiryDate: string | null;
+} {
+  const lowerText = text.toLowerCase();
+  
+  // Units to look for (longest first to avoid partial matches)
+  const units = ['kilogram', 'kg', 'gram', 'g', 'liter', 'liters', 'ml', 'milliliter', 
+                 'pieces', 'pcs', 'boxes', 'box', 'packets', 'packet', 'pkt',
+                 'bottles', 'bottle', 'btl', 'cans', 'can', 'cartons', 'carton', 'ctn'];
+  
+  // Date keywords
+  const dateKeywords = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december',
+                        'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+                        'tomorrow', 'today', 'yesterday', 'month', 'year', 'week', 'day', 'after', 'from', 'in',
+                        'जनवरी', 'फरवरी', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुलाई', 'अगस्त', 'सितंबर', 'अक्टूबर', 'नवंबर', 'दिसंबर'];
+  
+  let name = '';
+  let quantity = '';
+  let unit = '';
+  let expiryDate = '';
+  
+  // Extract quantity (number + optional unit)
+  const qtyMatch = text.match(/(\d+)\s*((?:kilogram|kg|gram|g|liter|liters|ml|pieces|pcs|boxes|box|packets|packet|pkt|bottles|bottle|btl|cans|can|cartons|carton|ctn)?)/i);
+  if (qtyMatch) {
+    quantity = qtyMatch[1];
+    if (qtyMatch[2]) {
+      unit = qtyMatch[2];
+    }
+  }
+  
+  // Extract date-related info (look for date keywords or date patterns)
+  let dateEndIndex = 0;
+  for (const keyword of dateKeywords) {
+    const idx = lowerText.indexOf(keyword);
+    if (idx !== -1) {
+      dateEndIndex = Math.max(dateEndIndex, idx + keyword.length);
+      expiryDate = text.substring(idx);
+      break;
+    }
+  }
+  
+  // Also check for date patterns like "12/25/2025" or "25-12-2025"
+  const datePatternMatch = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/);
+  if (datePatternMatch) {
+    expiryDate = datePatternMatch[1];
+    dateEndIndex = Math.max(dateEndIndex, text.indexOf(datePatternMatch[0]) + datePatternMatch[0].length);
+  }
+  
+  // Extract name (text before quantity/date, or everything if no qty/date found)
+  const relevantEnd = Math.max(
+    qtyMatch ? text.indexOf(qtyMatch[0]) : 0,
+    dateEndIndex
+  );
+  
+  if (relevantEnd > 0) {
+    name = text.substring(0, relevantEnd).trim();
+  } else {
+    name = text.trim();
+  }
+  
+  return {
+    name: name || null,
+    quantity: quantity || null,
+    unit: unit || null,
+    expiryDate: expiryDate || null,
+  };
+}
+
