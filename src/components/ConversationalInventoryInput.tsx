@@ -290,12 +290,13 @@ export default function ConversationalInventoryInput({
           
           // If user provided quantity too, move to next step
           if (parsed.quantity) {
-            setCurrentProductData(prev => ({ ...prev, name: parsed.name || '', quantity: parsed.quantity || '' }));
+            // Store name, qty, and any expiry we found
+            setCurrentProductData(prev => ({ ...prev, name: parsed.name || '', quantity: parsed.quantity || '', expiryDate: parsed.expiryDate || '' }));
             
             // If user also provided unit, move to expiry
             if (parsed.unit) {
               console.log('[SMART PARSE] Has unit:', parsed.unit, '- checking for expiry');
-              setCurrentProductData(prev => ({ ...prev, name: parsed.name || '', quantity: parsed.quantity || '', unit: parsed.unit || '' }));
+              setCurrentProductData(prev => ({ ...prev, name: parsed.name || '', quantity: parsed.quantity || '', unit: parsed.unit || '', expiryDate: parsed.expiryDate || '' }));
               
               // If user also provided expiry date, complete the product!
               if (parsed.expiryDate) {
@@ -384,9 +385,43 @@ export default function ConversationalInventoryInput({
         const lowerText = text.toLowerCase();
         const detectedUnit = unitVariations.find(u => lowerText.includes(u)) || text.trim();
         console.log('[UNIT FIELD] Detected unit:', detectedUnit, 'from input:', text);
-        setCurrentProductData(prev => ({ ...prev, unit: detectedUnit }));
-        setCurrentField('expiry');
-        addAIMessage(getMessage('unitQuestion'));
+        
+        const updatedProduct = { ...currentProductData, unit: detectedUnit };
+        setCurrentProductData(updatedProduct);
+        
+        // Check if we already have an expiry from the name field parsing
+        if (updatedProduct.expiryDate) {
+          // We have all details - complete the product!
+          console.log('[UNIT FIELD] Already have expiry:', updatedProduct.expiryDate, '- completing product');
+          
+          const completedProduct: PendingProduct = {
+            name: updatedProduct.name,
+            quantity: updatedProduct.quantity,
+            unit: detectedUnit,
+            expiryDate: updatedProduct.expiryDate,
+          };
+          
+          setProducts(prev => [...prev, completedProduct]);
+          const normalizedQty = normalizeQuantity(completedProduct.quantity);
+          const normalizedUnit = abbreviateUnit(completedProduct.unit);
+          
+          addAIMessage(
+            getMessage('productAdded', {
+              qty: normalizedQty,
+              unit: normalizedUnit,
+              name: completedProduct.name,
+              expiry: completedProduct.expiryDate,
+            })
+          );
+          
+          setCurrentField(null);
+          setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
+          addAIMessage(getMessage('invalidCommand'));
+        } else {
+          // Need to ask for expiry
+          setCurrentField('expiry');
+          addAIMessage(getMessage('unitQuestion'));
+        }
       }
       // STEP 5: Get expiry date
       else if (currentField === 'expiry') {
@@ -793,6 +828,22 @@ function convertRelativeDate(dateStr: string): string {
     return `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth() + 1).padStart(2, '0')}-${date.getFullYear()}`;
   };
   
+  // Month name to number mapping
+  const monthMap: Record<string, number> = {
+    'january': 1, 'jan': 1,
+    'february': 2, 'feb': 2,
+    'march': 3, 'mar': 3,
+    'april': 4, 'apr': 4,
+    'may': 5,
+    'june': 6, 'jun': 6,
+    'july': 7, 'jul': 7,
+    'august': 8, 'aug': 8,
+    'september': 9, 'sep': 9,
+    'october': 10, 'oct': 10,
+    'november': 11, 'nov': 11,
+    'december': 12, 'dec': 12,
+  };
+  
   // Check "day after tomorrow" BEFORE "tomorrow" (order matters!)
   if (lowerStr.includes('day after tomorrow')) {
     const dayAfterTomorrow = new Date(today);
@@ -827,7 +878,42 @@ function convertRelativeDate(dateStr: string): string {
     return formatDate(nextMonthDate);
   }
   
-  // If already in a date format or month name, return as-is
+  // Try to parse dates with month names like "25 december 2025" or "december 25 2025"
+  for (const [monthName, monthNum] of Object.entries(monthMap)) {
+    if (lowerStr.includes(monthName)) {
+      // Try pattern: "DD MONTHNAME YYYY"
+      const pattern1 = new RegExp(`(\\d{1,2})\\s+${monthName}\\s+(\\d{4})`, 'i');
+      const match1 = dateStr.match(pattern1);
+      if (match1) {
+        const day = String(match1[1]).padStart(2, '0');
+        const month = String(monthNum).padStart(2, '0');
+        const year = match1[2];
+        return `${day}-${month}-${year}`;
+      }
+      
+      // Try pattern: "MONTHNAME DD YYYY"
+      const pattern2 = new RegExp(`${monthName}\\s+(\\d{1,2})\\s+(\\d{4})`, 'i');
+      const match2 = dateStr.match(pattern2);
+      if (match2) {
+        const day = String(match2[1]).padStart(2, '0');
+        const month = String(monthNum).padStart(2, '0');
+        const year = match2[2];
+        return `${day}-${month}-${year}`;
+      }
+      
+      // If only month and year: "december 2025" - use last day of month
+      const pattern3 = new RegExp(`${monthName}\\s+(\\d{4})`, 'i');
+      const match3 = dateStr.match(pattern3);
+      if (match3) {
+        const year = match3[1];
+        const lastDay = new Date(parseInt(year), monthNum, 0).getDate();
+        const month = String(monthNum).padStart(2, '0');
+        return `${String(lastDay).padStart(2, '0')}-${month}-${year}`;
+      }
+    }
+  }
+  
+  // If already in a date format or couldn't parse, return as-is
   return dateStr;
 }
 
