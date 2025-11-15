@@ -333,7 +333,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
             </button>
             <button
               onClick={processTranscript}
-              disabled={!manualText.trim() || isProcessing}
+              disabled={(!manualText.trim() && !transcript.trim()) || isProcessing}
               className="flex-1 bg-green-600 text-white py-2 rounded-lg font-medium hover:bg-green-700 transition disabled:opacity-50"
             >
               Confirm

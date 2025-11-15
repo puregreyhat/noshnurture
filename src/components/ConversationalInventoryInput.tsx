@@ -44,6 +44,7 @@ export default function ConversationalInventoryInput({
   const recognitionRef = useRef<any>(null);
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -121,7 +122,8 @@ export default function ConversationalInventoryInput({
 
   // Start conversation
   useEffect(() => {
-    if (conversation.length === 0) {
+    if (conversation.length === 0 && !initializedRef.current) {
+      initializedRef.current = true;
       startConversation();
     }
   }, []);

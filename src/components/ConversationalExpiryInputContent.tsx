@@ -31,6 +31,7 @@ export default function ConversationalExpiryInputContent({
   const recognitionRef = useRef<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -108,7 +109,8 @@ export default function ConversationalExpiryInputContent({
 
   // Start conversation
   useEffect(() => {
-    if (messages.length === 0 && products.length > 0) {
+    if (messages.length === 0 && products.length > 0 && !initializedRef.current) {
+      initializedRef.current = true;
       addAIMessage(
         `Give expiry date for 1) ${products[0].productName} (${products[0].quantity} ${products[0].unit}, ${products[0].size})`
       );
