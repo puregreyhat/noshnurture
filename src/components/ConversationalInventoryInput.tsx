@@ -56,6 +56,7 @@ export default function ConversationalInventoryInput({
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initializedRef = useRef(false);
+  const handleUserInputRef = useRef<any>(null);
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,7 +99,9 @@ export default function ConversationalInventoryInput({
       
       // Only process when we have a final transcript
       if (finalTranscript.trim()) {
-        handleUserInput(finalTranscript.trim());
+        console.log('Voice input received:', finalTranscript.trim());
+        // Call the handler directly using current state, not stale closure
+        handleUserInputRef.current?.(finalTranscript.trim());
       }
     };
 
@@ -176,6 +179,11 @@ export default function ConversationalInventoryInput({
       }
     };
   }, []);
+
+  // Update the handler ref whenever state changes so recognition always calls latest version
+  useEffect(() => {
+    handleUserInputRef.current = handleUserInput;
+  }, [currentField, totalProducts, products, language, currentProductData, isProcessing]);
 
   const addUserMessage = (text: string) => {
     const newMessage: ConversationMessage = {
@@ -374,7 +382,8 @@ export default function ConversationalInventoryInput({
     }
   };
 
-
+  // Initialize ref with the function immediately so recognition has a valid reference
+  handleUserInputRef.current = handleUserInput;
 
   const toggleListening = () => {
     if (isListening) {
