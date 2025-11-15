@@ -241,8 +241,54 @@ export default function ConversationalInventoryInput({
           `✓ Added ${completedProduct.quantity} ${completedProduct.unit} of ${completedProduct.name} expiring on ${expiryDate}. Say "next" or "confirm" to add the next product, or "done" if finished.`
         );
         
+        // CRITICAL FIX: Set currentField to null so we can handle next/confirm/done
+        setCurrentField(null);
+        
         // Reset for next product
         setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
+      }
+      // STEP 6: Handle next/confirm/done commands when waiting for confirmation
+      else if (currentField === null && products.length > 0) {
+        const lowerText = text.toLowerCase().trim();
+        
+        if (lowerText.includes('next') || lowerText.includes('confirm')) {
+          // Move to next product
+          if (currentProductIndex < totalProducts) {
+            const nextIndex = currentProductIndex + 1;
+            setCurrentProductIndex(nextIndex);
+            setCurrentField('name');
+            setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
+            addAIMessage(`Great! Now let's add product ${nextIndex}. What is the product name?`);
+          } else {
+            // All products added
+            addAIMessage('Perfect! All products have been added. Submitting your inventory...');
+            setCurrentField(null);
+            onProductsAdded(
+              products.map(p => ({
+                name: p.name,
+                quantity: parseFloat(p.quantity),
+                unit: p.unit,
+                expiryDate: p.expiryDate,
+              }))
+            );
+            setTimeout(() => onClose(), 2000);
+          }
+        } else if (lowerText.includes('done')) {
+          // User finished adding products
+          addAIMessage('Perfect! All products have been added. Submitting your inventory...');
+          setCurrentField(null);
+          onProductsAdded(
+            products.map(p => ({
+              name: p.name,
+              quantity: parseFloat(p.quantity),
+              unit: p.unit,
+              expiryDate: p.expiryDate,
+            }))
+          );
+          setTimeout(() => onClose(), 2000);
+        } else {
+          addAIMessage("Please say 'next' or 'confirm' to add another product, or 'done' if you're finished.");
+        }
       }
     } catch (error) {
       console.error('Error processing input:', error);
@@ -252,32 +298,7 @@ export default function ConversationalInventoryInput({
     }
   };
 
-  const handleConfirmProduct = () => {
-    if (currentProductIndex < totalProducts) {
-      setCurrentProductIndex(prev => prev + 1);
-      setCurrentField('name');
-      setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
-      addAIMessage(`Great! Now let's add product ${currentProductIndex + 1}. What is the product name?`);
-    } else {
-      // All products added
-      addAIMessage('Perfect! All products have been added. Submitting your inventory...');
-      onProductsAdded(
-        products.map(p => ({
-          name: p.name,
-          quantity: parseFloat(p.quantity),
-          unit: p.unit,
-          expiryDate: p.expiryDate,
-        }))
-      );
-      setTimeout(() => onClose(), 2000);
-    }
-  };
 
-  const handleRejectAndRetry = () => {
-    const lastProduct = products.pop();
-    setProducts([...products]);
-    addAIMessage("No problem. Let's try again. Please tell me the product details.");
-  };
 
   const toggleListening = () => {
     if (isListening) {
@@ -401,24 +422,6 @@ export default function ConversationalInventoryInput({
             <div className="flex items-center gap-2 text-purple-600 text-sm">
               <Loader size={16} className="animate-spin" />
               Processing...
-            </div>
-          )}
-
-          {/* Action Buttons - Show when waiting for confirmation */}
-          {products.length > 0 && currentProductIndex <= totalProducts && conversation[conversation.length - 1]?.type === 'ai' && conversation[conversation.length - 1]?.content.includes('Confirm?') && (
-            <div className="flex gap-2">
-              <button
-                onClick={handleConfirmProduct}
-                className="flex-1 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold transition"
-              >
-                ✓ Confirm
-              </button>
-              <button
-                onClick={handleRejectAndRetry}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold transition"
-              >
-                ✗ Retry
-              </button>
             </div>
           )}
 
