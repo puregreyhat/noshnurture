@@ -321,10 +321,12 @@ export default function ConversationalInventoryInput({
                 
                 setCurrentField(null);
                 setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
+                // Show next/done prompt after product completed
+                addAIMessage(getMessage('invalidCommand'));
               } else {
                 // Have name, qty, unit - ask for expiry
                 setCurrentField('expiry');
-                addAIMessage(getMessage('unitQuestion'));
+                addAIMessage(getMessage('expiryQuestion'));
               }
             } else {
               // Have name and qty - ask for unit
@@ -391,6 +393,9 @@ export default function ConversationalInventoryInput({
         
         // Reset for next product
         setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
+        
+        // Show next/done prompt
+        addAIMessage(getMessage('invalidCommand'));
       }
       // STEP 6: Handle next/confirm/done commands when waiting for confirmation
       else if (currentField === null && products.length > 0) {
@@ -758,59 +763,64 @@ function parseProductDetails(text: string): {
 } {
   const lowerText = text.toLowerCase();
   
-  // Units to look for (longest first to avoid partial matches)
-  const units = ['kilogram', 'kg', 'gram', 'g', 'liter', 'liters', 'ml', 'milliliter', 
-                 'pieces', 'pcs', 'boxes', 'box', 'packets', 'packet', 'pkt',
-                 'bottles', 'bottle', 'btl', 'cans', 'can', 'cartons', 'carton', 'ctn'];
-  
-  // Date keywords
-  const dateKeywords = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december',
-                        'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
-                        'tomorrow', 'today', 'yesterday', 'month', 'year', 'week', 'day', 'after', 'from', 'in',
-                        'जनवरी', 'फरवरी', 'मार्च', 'अप्रैल', 'मई', 'जून', 'जुलाई', 'अगस्त', 'सितंबर', 'अक्टूबर', 'नवंबर', 'दिसंबर'];
-  
   let name = '';
   let quantity = '';
   let unit = '';
   let expiryDate = '';
   
-  // Extract quantity (number + optional unit)
-  const qtyMatch = text.match(/(\d+)\s*((?:kilogram|kg|gram|g|liter|liters|ml|pieces|pcs|boxes|box|packets|packet|pkt|bottles|bottle|btl|cans|can|cartons|carton|ctn)?)/i);
-  if (qtyMatch) {
-    quantity = qtyMatch[1];
-    if (qtyMatch[2]) {
-      unit = qtyMatch[2];
+  // Step 1: Extract quantity with unit (e.g., "1kg", "250 grams", "2 liters")
+  const qtyUnitMatch = text.match(/(\d+)\s*(kilogram|kg|gram|g|liter|liters|ml|milliliter|pieces|pcs|boxes|box|packets|packet|pkt|bottles|bottle|btl|cans|can|cartons|carton|ctn)?/i);
+  let qtyUnitEnd = 0;
+  
+  if (qtyUnitMatch) {
+    quantity = qtyUnitMatch[1];
+    if (qtyUnitMatch[2]) {
+      unit = qtyUnitMatch[2];
     }
+    qtyUnitEnd = text.indexOf(qtyUnitMatch[0]) + qtyUnitMatch[0].length;
   }
   
-  // Extract date-related info (look for date keywords or date patterns)
-  let dateEndIndex = 0;
+  // Step 2: Extract date info (look for month/year/date keywords AFTER the quantity)
+  const dateKeywords = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december',
+                        'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+                        'tomorrow', 'next month', 'next year', 'after a year', 'after a month'];
+  
+  let dateStartIndex = -1;
   for (const keyword of dateKeywords) {
     const idx = lowerText.indexOf(keyword);
-    if (idx !== -1) {
-      dateEndIndex = Math.max(dateEndIndex, idx + keyword.length);
-      expiryDate = text.substring(idx);
+    if (idx !== -1 && idx >= qtyUnitEnd) {  // Only look for dates AFTER quantity
+      dateStartIndex = idx;
+      expiryDate = text.substring(idx).trim();
       break;
     }
   }
   
-  // Also check for date patterns like "12/25/2025" or "25-12-2025"
-  const datePatternMatch = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2})/);
+  // Also check for date patterns like "12/25/2025" or "25-12-2025" or just year "2025" or "2026"
+  const datePatternMatch = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4}|\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}|\b\d{4}\b)/);
   if (datePatternMatch) {
-    expiryDate = datePatternMatch[1];
-    dateEndIndex = Math.max(dateEndIndex, text.indexOf(datePatternMatch[0]) + datePatternMatch[0].length);
+    const patternIdx = text.indexOf(datePatternMatch[0]);
+    if (patternIdx >= qtyUnitEnd) {  // Only use if AFTER quantity
+      if (dateStartIndex === -1 || patternIdx < dateStartIndex) {
+        expiryDate = datePatternMatch[1] || datePatternMatch[0];
+      }
+    }
   }
   
-  // Extract name (text before quantity/date, or everything if no qty/date found)
-  const relevantEnd = Math.max(
-    qtyMatch ? text.indexOf(qtyMatch[0]) : 0,
-    dateEndIndex
-  );
+  // Step 3: Extract name (everything before quantity or date)
+  let nameEnd = text.length;
+  if (qtyUnitMatch) {
+    nameEnd = text.indexOf(qtyUnitMatch[0]);
+  } else if (dateStartIndex !== -1) {
+    nameEnd = dateStartIndex;
+  }
   
-  if (relevantEnd > 0) {
-    name = text.substring(0, relevantEnd).trim();
-  } else {
-    name = text.trim();
+  if (nameEnd > 0) {
+    name = text.substring(0, nameEnd).trim();
+  }
+  
+  // If we have quantity but name is empty or is just the qty/unit, clear the name
+  if (quantity && (!name || name === text.trim())) {
+    name = '';
   }
   
   return {
