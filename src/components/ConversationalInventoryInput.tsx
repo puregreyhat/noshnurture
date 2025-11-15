@@ -41,6 +41,16 @@ export default function ConversationalInventoryInput({
   const [networkErrorCount, setNetworkErrorCount] = useState(0);
   const [voiceDisabled, setVoiceDisabled] = useState(false);
   const [useVoiceMode, setUseVoiceMode] = useState(false); // Start in text mode
+  
+  // Track which field we're currently asking for
+  const [currentProductData, setCurrentProductData] = useState<PendingProduct>({
+    name: '',
+    quantity: '',
+    unit: '',
+    expiryDate: '',
+  });
+  const [currentField, setCurrentField] = useState<'count' | 'name' | 'quantity' | 'unit' | 'expiry' | null>(null);
+  
   const recognitionRef = useRef<any>(null);
   const conversationEndRef = useRef<HTMLDivElement>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -163,6 +173,7 @@ export default function ConversationalInventoryInput({
   const startConversation = () => {
     const greeting = "Hello! I'll help you add products to your inventory. How many products would you like to add today?";
     addAIMessage(greeting);
+    setCurrentField('count');
   };
 
   const handleUserInput = async (text: string) => {
@@ -172,49 +183,65 @@ export default function ConversationalInventoryInput({
     setIsProcessing(true);
 
     try {
-      // If we haven't received total products count yet
-      if (totalProducts === 0) {
+      // STEP 1: Get total product count
+      if (currentField === 'count') {
         const count = extractNumberFromText(text);
         if (count > 0) {
           setTotalProducts(count);
           setCurrentProductIndex(1);
+          setCurrentField('name');
+          setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
           addAIMessage(
-            `Perfect! I'll help you add ${count} products. Let's start with product 1. What is the first product name?`
+            `Perfect! I'll help you add ${count} products. Let's start with product 1. What is the product name?`
           );
         } else {
-          addAIMessage("I didn't catch that. Please tell me how many products you want to add (e.g., 'I have 10 products')");
+          addAIMessage("I didn't catch that. Please tell me how many products (e.g., 'I have 3 products' or just '3')");
         }
       }
-      // If we're in the product collection phase
-      else if (currentProductIndex <= totalProducts) {
-        const extractedData = await extractProductDetailsFromSpeech(text);
-
-        if (extractedData.productName || extractedData.quantity || extractedData.expiryDate) {
-          // We have partial or complete product data
-          const pendingProduct: PendingProduct = {
-            name: extractedData.productName || 'Unknown Product',
-            quantity: extractedData.quantity || '0',
-            unit: extractedData.unit || 'kg',
-            expiryDate: extractedData.expiryDate || '',
-          };
-
-          // Ask for missing information
-          if (!extractedData.productName) {
-            addAIMessage(`I heard: "${text}". Is this the product name?`);
-          } else if (!extractedData.quantity) {
-            addAIMessage(`Got it - ${extractedData.productName}. What's the quantity and unit? (e.g., '1 kg')`);
-          } else if (!extractedData.expiryDate) {
-            addAIMessage(`${extractedData.productName}, ${extractedData.quantity} ${extractedData.unit}. What's the expiry date? (e.g., '29 06 2026')`);
-          } else {
-            // We have all information, confirm
-            setProducts(prev => [...prev, pendingProduct]);
-            addAIMessage(
-              `✓ Added ${pendingProduct.quantity} ${pendingProduct.unit} of ${pendingProduct.name} expiring on ${pendingProduct.expiryDate}. Confirm?`
-            );
-          }
+      // STEP 2: Get product name
+      else if (currentField === 'name') {
+        // Just use the text as product name
+        setCurrentProductData(prev => ({ ...prev, name: text.trim() }));
+        setCurrentField('quantity');
+        addAIMessage(`Got it - ${text.trim()}. What's the quantity? (e.g., '2' or '500')`);
+      }
+      // STEP 3: Get quantity
+      else if (currentField === 'quantity') {
+        const qty = text.match(/\d+/)?.[0];
+        if (qty) {
+          setCurrentProductData(prev => ({ ...prev, quantity: qty }));
+          setCurrentField('unit');
+          addAIMessage(`${qty} what? (e.g., 'kg', 'liters', 'packets', 'boxes')`);
         } else {
-          addAIMessage("I didn't quite catch that. Please repeat the product details clearly.");
+          addAIMessage(`I didn't get that. Please tell me the quantity as a number (e.g., '2' for 2 kg)`);
         }
+      }
+      // STEP 4: Get unit
+      else if (currentField === 'unit') {
+        const units = ['kg', 'g', 'liter', 'liters', 'ml', 'pieces', 'boxes', 'packets', 'bottles', 'cans', 'cartons'];
+        const detectedUnit = units.find(u => text.toLowerCase().includes(u)) || text.trim();
+        setCurrentProductData(prev => ({ ...prev, unit: detectedUnit }));
+        setCurrentField('expiry');
+        addAIMessage(`Great! Now, what's the expiry date? (e.g., '29 06 2026' or 'December 25')`);
+      }
+      // STEP 5: Get expiry date
+      else if (currentField === 'expiry') {
+        // Parse the expiry date
+        const extractedData = await extractProductDetailsFromSpeech(text);
+        const expiryDate = extractedData.expiryDate || text.trim();
+        
+        const completedProduct: PendingProduct = {
+          ...currentProductData,
+          expiryDate,
+        };
+
+        setProducts(prev => [...prev, completedProduct]);
+        addAIMessage(
+          `✓ Added ${completedProduct.quantity} ${completedProduct.unit} of ${completedProduct.name} expiring on ${expiryDate}. Say "next" or "confirm" to add the next product, or "done" if finished.`
+        );
+        
+        // Reset for next product
+        setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
       }
     } catch (error) {
       console.error('Error processing input:', error);
@@ -227,7 +254,9 @@ export default function ConversationalInventoryInput({
   const handleConfirmProduct = () => {
     if (currentProductIndex < totalProducts) {
       setCurrentProductIndex(prev => prev + 1);
-      addAIMessage(`Great! Now let's add product ${currentProductIndex + 1}. What is it?`);
+      setCurrentField('name');
+      setCurrentProductData({ name: '', quantity: '', unit: '', expiryDate: '' });
+      addAIMessage(`Great! Now let's add product ${currentProductIndex + 1}. What is the product name?`);
     } else {
       // All products added
       addAIMessage('Perfect! All products have been added. Submitting your inventory...');
@@ -412,8 +441,29 @@ export default function ConversationalInventoryInput({
   );
 }
 
-// Helper function to extract numbers from text
+// Helper function to extract numbers from text (handles both digits and words)
 function extractNumberFromText(text: string): number {
-  const numberMatch = text.match(/(\d+)/);
-  return numberMatch ? parseInt(numberMatch[1], 10) : 0;
+  // First try to match digits
+  const digitMatch = text.match(/\b(\d+)\b/);
+  if (digitMatch) {
+    return parseInt(digitMatch[1], 10);
+  }
+
+  // Map of word numbers to digits
+  const wordNumbers: Record<string, number> = {
+    'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+    'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+    'eleven': 11, 'twelve': 12, 'thirteen': 13, 'fourteen': 14, 'fifteen': 15,
+    'sixteen': 16, 'seventeen': 17, 'eighteen': 18, 'nineteen': 19, 'twenty': 20,
+  };
+
+  // Convert to lowercase and search for word numbers
+  const lowerText = text.toLowerCase();
+  for (const [word, num] of Object.entries(wordNumbers)) {
+    if (lowerText.includes(word)) {
+      return num;
+    }
+  }
+
+  return 0;
 }
