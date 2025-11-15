@@ -51,6 +51,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
   const [voiceAvailable, setVoiceAvailable] = useState(true);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const finalTranscriptRef = useRef<string>('');
 
   useEffect(() => {
     // Initialize speech recognition
@@ -70,26 +71,25 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
     recognition.language = language;
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = '';
-      let final = '';
+      let interimTranscript = '';
 
+      // Build interim transcript for live display
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const transcript = event.results[i][0].transcript;
 
         if (event.results[i].isFinal) {
-          final += transcript + ' ';
+          // Add to our final transcript accumulator (only once per final result)
+          if (!finalTranscriptRef.current.includes(transcript)) {
+            finalTranscriptRef.current += transcript + ' ';
+          }
         } else {
-          interim += transcript;
+          interimTranscript += transcript;
         }
       }
 
-      if (final) {
-        setTranscript((prev) => prev + final);
-      } else if (interim) {
-        setTranscript((prev) => {
-          const parts = prev.split('|');
-          return parts[0] + '|' + interim;
-        });
+      // Update state: show final + interim (final will be "final|interim")
+      if (finalTranscriptRef.current || interimTranscript) {
+        setTranscript(finalTranscriptRef.current + '|' + interimTranscript);
       }
     };
 
@@ -156,6 +156,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setError(null);
     setTranscript('');
+    finalTranscriptRef.current = '';  // Reset final transcript for new recording session
     startListeningInternal();
   };
 
