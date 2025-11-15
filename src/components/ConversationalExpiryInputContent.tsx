@@ -8,6 +8,7 @@ interface ConversationalExpiryInputContentProps {
   products: BillProduct[];
   onComplete: (dates: Record<string, string>) => void;
   onClose: () => void;
+  language?: string; // Optional language prop from parent
 }
 
 interface Message {
@@ -19,6 +20,7 @@ export default function ConversationalExpiryInputContent({
   products,
   onComplete,
   onClose,
+  language = 'en-IN', // Default to English
 }: ConversationalExpiryInputContentProps) {
   const [currentProductIndex, setCurrentProductIndex] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -48,7 +50,7 @@ export default function ConversationalExpiryInputContent({
     recognitionRef.current = new SpeechRecognition();
     recognitionRef.current.continuous = false;
     recognitionRef.current.interimResults = false;
-    recognitionRef.current.lang = 'en-IN';
+    recognitionRef.current.lang = language; // Use language prop
 
     recognitionRef.current.onstart = () => {
       setIsListening(true);
@@ -105,7 +107,7 @@ export default function ConversationalExpiryInputContent({
         addAIMessage(`Error: ${event.error}. Please try typing instead.`);
       }
     };
-  }, []);
+  }, [language]);
 
   // Start conversation
   useEffect(() => {

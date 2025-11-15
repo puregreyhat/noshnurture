@@ -30,6 +30,7 @@ export default function BillUploadModal({
   const [isLoading, setIsLoading] = useState(false);
   const [extractedProducts, setExtractedProducts] = useState<BillProduct[]>([]);
   const [enteredExpiryDates, setEnteredExpiryDates] = useState<Record<string, string>>({});
+  const [language, setLanguage] = useState('en-IN'); // Add language state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
 
@@ -190,12 +191,39 @@ export default function BillUploadModal({
               {step === 'manual' && 'Step 3/3: Add Expiry Dates (Manual)'}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition"
-          >
-            <X size={24} />
-          </button>
+          <div className="flex gap-2 items-center">
+            {/* Language Toggle - Show in voice mode */}
+            {step === 'voice' && (
+              <div className="flex gap-2 bg-white bg-opacity-20 p-1 rounded-lg">
+                <button
+                  onClick={() => setLanguage('en-IN')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition ${
+                    language === 'en-IN'
+                      ? 'bg-white text-orange-600'
+                      : 'text-white hover:bg-white hover:bg-opacity-10'
+                  }`}
+                >
+                  English
+                </button>
+                <button
+                  onClick={() => setLanguage('hi-IN')}
+                  className={`px-3 py-1 rounded text-sm font-medium transition ${
+                    language === 'hi-IN'
+                      ? 'bg-white text-orange-600'
+                      : 'text-white hover:bg-white hover:bg-opacity-10'
+                  }`}
+                >
+                  हिंदी
+                </button>
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition"
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -328,6 +356,7 @@ export default function BillUploadModal({
               products={extractedProducts}
               onComplete={handleExpiryDatesEntered}
               onClose={handleBackClick}
+              language={language}
             />
           )}
 

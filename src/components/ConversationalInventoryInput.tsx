@@ -41,6 +41,7 @@ export default function ConversationalInventoryInput({
   const [networkErrorCount, setNetworkErrorCount] = useState(0);
   const [voiceDisabled, setVoiceDisabled] = useState(false);
   const [useVoiceMode, setUseVoiceMode] = useState(false); // Start in text mode
+  const [language, setLanguage] = useState('en-IN'); // Add language state
   
   // Track which field we're currently asking for
   const [currentProductData, setCurrentProductData] = useState<PendingProduct>({
@@ -71,7 +72,7 @@ export default function ConversationalInventoryInput({
     recognitionRef.current = new SpeechRecognition();
     recognitionRef.current.continuous = false;
     recognitionRef.current.interimResults = true;
-    recognitionRef.current.lang = 'en-IN';
+    recognitionRef.current.lang = language; // Use dynamic language state
 
     recognitionRef.current.onstart = () => {
       setIsListening(true);
@@ -128,7 +129,7 @@ export default function ConversationalInventoryInput({
         addAIMessage(`Error: ${event.error}. Please try typing instead.`);
       }
     };
-  }, []);
+  }, [language]);
 
   // Start conversation
   useEffect(() => {
@@ -329,12 +330,47 @@ export default function ConversationalInventoryInput({
               </p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition"
-          >
-            <X size={24} />
-          </button>
+          <div className="flex gap-2 items-center">
+            {/* Language Toggle */}
+            <div className="flex gap-2 bg-white bg-opacity-20 p-1 rounded-lg">
+              <button
+                onClick={() => {
+                  setLanguage('en-IN');
+                  setConversation([]);
+                  initializedRef.current = false;
+                  startConversation();
+                }}
+                className={`px-3 py-1 rounded text-sm font-medium transition ${
+                  language === 'en-IN'
+                    ? 'bg-white text-purple-600'
+                    : 'text-white hover:bg-white hover:bg-opacity-10'
+                }`}
+              >
+                English
+              </button>
+              <button
+                onClick={() => {
+                  setLanguage('hi-IN');
+                  setConversation([]);
+                  initializedRef.current = false;
+                  startConversation();
+                }}
+                className={`px-3 py-1 rounded text-sm font-medium transition ${
+                  language === 'hi-IN'
+                    ? 'bg-white text-purple-600'
+                    : 'text-white hover:bg-white hover:bg-opacity-10'
+                }`}
+              >
+                हिंदी
+              </button>
+            </div>
+            <button
+              onClick={onClose}
+              className="hover:bg-white hover:bg-opacity-20 p-2 rounded-lg transition"
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Conversation History */}
