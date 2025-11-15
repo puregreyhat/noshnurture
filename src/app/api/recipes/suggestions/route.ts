@@ -145,6 +145,14 @@ export async function GET(request: Request) {
             const matchedIngredients: string[] = [];
             const missingIngredients: string[] = [];
             
+            // DEBUG LOGGING
+            const isDebugRecipe = title.toLowerCase().includes('aloo') || title.toLowerCase().includes('tikki');
+            if (isDebugRecipe) {
+              console.log(`\n=== DEBUG: Processing recipe: ${title} ===`);
+              console.log(`Inventory items (${inventoryNames.length}): ${inventoryNames.join(', ')}`);
+              console.log(`Total recipe ingredients: ${ingredients.length}`);
+            }
+            
             // Use for loop to allow async normalization
             for (const ing of ingredients) {
               // Handle both string and object ingredient formats
@@ -172,11 +180,19 @@ export async function GET(request: Request) {
               // Check 2: Fallback to substring matching (for fuzzy-matched inventory)
               const hasSubstringMatch = inventoryNames.some(inv => ingName.toLowerCase().includes(inv.toLowerCase()) || inv.toLowerCase().includes(ingName.toLowerCase()));
               
+              if (isDebugRecipe) {
+                console.log(`  "${ingName}" → normalized="${normalized}" → exact=${hasExactMatch}, substring=${hasSubstringMatch} → ${hasExactMatch || hasSubstringMatch ? 'MATCHED ✓' : 'MISSING ✗'}`);
+              }
+              
               if (hasExactMatch || hasSubstringMatch) {
                 matchedIngredients.push(ingName);
               } else {
                 missingIngredients.push(ingName);
               }
+            }
+            
+            if (isDebugRecipe) {
+              console.log(`=== RESULT: ${matchedIngredients.length} matched, ${missingIngredients.length} missing ===\n`);
             }
             
             const matchedCount = matchedIngredients.length;
