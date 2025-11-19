@@ -1,0 +1,57 @@
+<h1 id="noshnurture-oral-exam-cheat-sheet-one-page">NoshNurture — Oral
+Exam Cheat-sheet (One page)</h1>
+<p>Quick facts &amp; one-line answers you can say in an oral</p>
+<p>Project in one line - Inventory app to track home food items, compute
+expiry, suggest recipes and reduce waste.</p>
+<p>Main features - Add/import items, compute days-until-expiry, label
+items (fresh / caution / warning / expired), recipe suggestions, Vkart
+import/sync and in-app expiry alerts.</p>
+<p>Tech stack (one-liners) - Framework: Next.js (app-router) +
+TypeScript - DB/Auth: Supabase (tables in
+<code>database-schema.sql</code>) - Styling: Tailwind CSS - Tests:
+Vitest</p>
+<p>Where to find core logic (file pointers) - Expiry calculation:
+<code>src/lib/productUtils.ts</code> →
+<code>daysUntilExpiry(expiryDate)</code> - Status mapping used on
+insert/import: <code>src/app/api/inventory/update/route.ts</code> and
+<code>src/app/api/vkart-sync/route.ts</code> (<code>mapStatus</code>) -
+Alert UI: <code>src/components/ExpiryAlert.tsx</code> - DB schema:
+<code>database-schema.sql</code> (status CHECK, indexed)</p>
+<p>Exact expiry-&gt;status mapping (copy-paste answer) - expired: days
+&lt; 0 (expiry date before today) - warning: 0 ≤ days ≤ 3 (including
+“expires today”) - caution: 4 ≤ days ≤ 7 - fresh: days &gt; 7</p>
+<p>One-line answers for common follow-ups - How are days computed? →
+Math.floor((expiry - today) / (1000<em>60</em>60*24)) in
+<code>daysUntilExpiry</code>. - Timezone/partial-day nuance? → Uses JS
+Date; partial days are floored so 1.9 days → 1 day. - Missing expiry
+behavior? → Currently defaults to days = 0 and expiry_date = now on
+insert, so becomes <code>warning</code>. - Where is status stored? →
+<code>inventory_items.status</code> in Supabase (database-schema.sql)
+and indexed for filters. - How imports map status? →
+<code>vkart-sync</code> uses <code>enhanceProductData</code> then
+<code>mapStatus</code> and inserts <code>status</code> before storing. -
+How to change thresholds? → Centralize mapping into an exported helper
+and/or env vars; provide a backfill script for DB if you want existing
+rows updated. - Best quick fix for missing expiry? → Treat missing
+expiry as <code>unknown</code> (add status) or keep it as
+<code>warning</code> if you want to force user attention.</p>
+<p>Edge cases to mention (one-liners) - Items without expiry being
+marked <code>warning</code> by default can be surprising to users. -
+Time-of-day and timezone differences can shift an item from
+<code>fresh</code> → <code>warning</code> depending on local time vs
+stored ISO string. - Partial-day flooring means items expiring later
+today count as 0 days remaining.</p>
+<p>One-minute elevator pitch (say this in 30s) - “NoshNurture helps
+household users track food inventory, automatically calculates days
+until expiry, categorizes items into fresh/caution/warning/expired using
+simple thresholds, and suggests recipes — all backed by Supabase and
+importable from external order systems.”</p>
+<p>Notes to prepare for follow-ups - Be ready to explain where you’d
+centralize thresholds (one helper in <code>src/lib</code>) and how you’d
+backfill the DB safely (one-off script run in maintenance window). - If
+asked about notifications, mention in-app alerts already exist
+(<code>ExpiryAlert</code>) and you can add email/push with opt-in.</p>
+<hr />
+<p>Small print: open <code>docs/ORAL_CHEAT_SHEET.md</code> to print or
+convert to PDF. Use <code>pandoc</code> or your editor’s print-to-PDF
+feature.</p>
