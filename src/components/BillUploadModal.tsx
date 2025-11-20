@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
-import { Upload, X, Loader, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Upload, X, Loader, ChevronRight, ChevronLeft, CheckCircle } from 'lucide-react';
 import { extractProductsFromBill, BillProduct } from '@/lib/gemini-service';
 import ConversationalExpiryInputContent from './ConversationalExpiryInput';
 import ProductExpiryTableContent from './ProductExpiryTable';
 import MultiExpiryScanner from './MultiExpiryScanner';
+import { getDefaultExpiryDate } from '@/lib/default-expiry';
 
 interface BillUploadModalProps {
   onProductsAdded: (products: Array<{
@@ -30,10 +31,37 @@ export default function BillUploadModal({
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [extractedProducts, setExtractedProducts] = useState<BillProduct[]>([]);
+  const [removedVegetables, setRemovedVegetables] = useState<BillProduct[]>([]);
+  const [vegetablesWithExpiry, setVegetablesWithExpiry] = useState<Array<{
+    name: string;
+    quantity: number;
+    unit: string;
+    size: string;
+    expiryDate: string;
+    price?: string;
+  }>>([]);
+  const [showVegetableNotice, setShowVegetableNotice] = useState(false);
   const [enteredExpiryDates, setEnteredExpiryDates] = useState<Record<string, string>>({});
   const [language, setLanguage] = useState('en-IN'); // Add language state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
+
+  // Check if product is a vegetable/fruit
+  const isVegetableOrFruit = (productName: string): boolean => {
+    const name = productName.toLowerCase();
+    const veggiesAndFruits = [
+      'tomato', 'potato', 'onion', 'carrot', 'cucumber', 'capsicum', 'pepper',
+      'spinach', 'palak', 'coriander', 'kothimbir', 'dhania', 'mint', 'pudina', 'lettuce',
+      'cabbage', 'cauliflower', 'broccoli', 'beetroot', 'radish', 'ginger',
+      'garlic', 'chili', 'chilli', 'chillies', 'mirch', 'eggplant', 'brinjal', 'baingan', 'okra',
+      'bhindi', 'peas', 'matar', 'beans', 'mushroom', 'corn', 'pumpkin',
+      'apple', 'seb', 'banana', 'kela', 'mango', 'aam', 'grapes', 'angoor',
+      'orange', 'santra', 'lemon', 'nimbu', 'papaya', 'watermelon', 
+      'pomegranate', 'anaar', 'strawberry', 'pineapple'
+    ];
+    return veggiesAndFruits.some(veg => name.includes(veg));
+  };
+
 
   const handleFileSelect = async (file: File) => {
     setError('');
@@ -119,7 +147,70 @@ export default function BillUploadModal({
             return;
           }
 
-          setExtractedProducts(products);
+          // Separate vegetables/fruits from other products
+          const vegetables: BillProduct[] = [];
+          const nonVegetables: BillProduct[] = [];
+          
+          products.forEach(product => {
+            if (isVegetableOrFruit(product.productName)) {
+              vegetables.push(product);
+            } else {
+              nonVegetables.push(product);
+            }
+          });
+
+          // If vegetables found, show notice and auto-add them with default expiry
+          if (vegetables.length > 0) {
+            setRemovedVegetables(vegetables);
+            setShowVegetableNotice(true);
+            
+            // Prepare vegetables with default expiry (but don't add yet)
+            const vegetableProducts = vegetables.map(veg => {
+              const defaultDate = getDefaultExpiryDate(veg.productName, 'refrigerator');
+              const formattedDate = `${String(defaultDate.getDate()).padStart(2, '0')}-${String(defaultDate.getMonth() + 1).padStart(2, '0')}-${defaultDate.getFullYear()}`;
+              return {
+                name: veg.productName,
+                quantity: parseFloat(veg.quantity),
+                unit: veg.unit,
+                size: veg.size,
+                expiryDate: formattedDate,
+                price: veg.price,
+              };
+            });
+            
+            // Store vegetables to add later with other products
+            setVegetablesWithExpiry(vegetableProducts);
+            
+            // Hide notice after animation
+            setTimeout(() => {
+              setShowVegetableNotice(false);
+            }, 3000);
+          }
+
+          // Continue with non-vegetables only
+          if (nonVegetables.length === 0) {
+            // All were vegetables, add them and close
+            setTimeout(() => {
+              const vegetableProducts = vegetables.map(veg => {
+                const defaultDate = getDefaultExpiryDate(veg.productName, 'refrigerator');
+                const formattedDate = `${String(defaultDate.getDate()).padStart(2, '0')}-${String(defaultDate.getMonth() + 1).padStart(2, '0')}-${defaultDate.getFullYear()}`;
+                return {
+                  name: veg.productName,
+                  quantity: parseFloat(veg.quantity),
+                  unit: veg.unit,
+                  size: veg.size,
+                  expiryDate: formattedDate,
+                  price: veg.price,
+                };
+              });
+              onProductsAdded(vegetableProducts);
+              onClose();
+            }, 3000);
+            setIsLoading(false);
+            return;
+          }
+
+          setExtractedProducts(nonVegetables);
           setStep('method-select');
           setIsLoading(false);
         } catch (err) {
@@ -161,7 +252,10 @@ export default function BillUploadModal({
       price: product.price,
     }));
 
-    onProductsAdded(productsWithExpiry);
+    // Combine with vegetables that were auto-processed
+    const allProducts = [...vegetablesWithExpiry, ...productsWithExpiry];
+    
+    onProductsAdded(allProducts);
     onClose();
   };
 
@@ -234,6 +328,29 @@ export default function BillUploadModal({
         <div className={`flex-1 overflow-y-auto bg-gray-50 ${
           step === 'scan' ? 'p-4' : 'p-6'
         }`}>
+          {/* Vegetable Notice */}
+          {showVegetableNotice && (
+            <div className="mb-4 p-4 bg-green-100 border-2 border-green-400 rounded-lg animate-pulse">
+              <div className="flex items-start gap-3">
+                <div className="text-3xl">🥬</div>
+                <div className="flex-1">
+                  <p className="font-bold text-green-900 mb-2">Vegetables/Fruits Detected!</p>
+                  <p className="text-sm text-green-800 mb-3">
+                    Auto-assigned household expiry dates. Removing from manual entry list...
+                  </p>
+                  <div className="space-y-1">
+                    {removedVegetables.map((veg, idx) => (
+                      <div key={idx} className="text-xs text-green-700 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4" />
+                        <span>{veg.productName} ({veg.size})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
           {error && (
             <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
               {error}

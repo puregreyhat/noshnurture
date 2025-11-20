@@ -42,7 +42,7 @@ export default function MultiExpiryScanner({ products, onComplete, onClose }: Mu
       'tomato', 'potato', 'onion', 'carrot', 'cucumber', 'capsicum', 'pepper',
       'spinach', 'palak', 'coriander', 'dhania', 'mint', 'pudina', 'lettuce',
       'cabbage', 'cauliflower', 'broccoli', 'beetroot', 'radish', 'ginger',
-      'garlic', 'chili', 'mirch', 'eggplant', 'brinjal', 'baingan', 'okra',
+      'garlic', 'chili', 'chilli', 'chillies', 'mirch', 'eggplant', 'brinjal', 'baingan', 'okra',
       'bhindi', 'peas', 'matar', 'beans', 'mushroom', 'corn', 'pumpkin',
       'apple', 'banana', 'mango', 'grapes', 'orange', 'lemon', 'papaya',
       'watermelon', 'pomegranate', 'strawberry', 'pineapple'
