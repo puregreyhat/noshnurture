@@ -43,7 +43,7 @@ export default function InventoryPage() {
         .select('*')
         .eq('user_id', user.id)
         .eq('is_consumed', false)
-        .order('days_until_expiry', { ascending: true });
+        .order('expiry_date', { ascending: true });
 
       if (error) {
         console.error('Error fetching inventory:', error);
@@ -57,13 +57,47 @@ export default function InventoryPage() {
     }
   };
 
+  const calculateDaysUntilExpiry = (expiryDate: string): number => {
+    if (!expiryDate) return 0;
+    try {
+      // Handle both DD/MM/YYYY and DD-MM-YYYY formats
+      const separator = expiryDate.includes('/') ? '/' : '-';
+      const [day, month, year] = expiryDate.split(separator).map(Number);
+
+      const exp = new Date(year, month - 1, day);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      exp.setHours(0, 0, 0, 0);
+
+      return Math.floor((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    } catch (e) {
+      console.error('Error parsing expiry date:', expiryDate, e);
+      return 0;
+    }
+  };
+
+  const getStatusFromDays = (days: number): 'fresh' | 'caution' | 'warning' | 'expired' => {
+    if (days < 0) return 'expired';
+    if (days <= 3) return 'warning';
+    if (days <= 7) return 'caution';
+    return 'fresh';
+  };
+
   // Group items by product name and sum quantities
   const groupedInventory = inventoryItems.reduce((acc, item) => {
     const existing = acc.find(i => i.product_name === item.product_name);
     if (existing) {
       existing.quantity += item.quantity;
     } else {
-      acc.push({ ...item });
+      // Calculate dynamic values
+      const days = calculateDaysUntilExpiry(item.expiry_date);
+      const status = getStatusFromDays(days);
+
+      acc.push({
+        ...item,
+        days_until_expiry: days,
+        status: status
+      });
     }
     return acc;
   }, [] as InventoryItemDB[]);
@@ -134,7 +168,9 @@ export default function InventoryPage() {
       clearTimeout(pressTimer);
       setPressTimer(null);
     }
-  }; return (
+  };
+
+  return (
     <div className="min-h-screen bg-[#FDFBF7] pb-24 font-['Poppins']">
       {/* Header */}
       <div className="bg-[#FDFBF7] py-12 px-8 relative overflow-hidden">

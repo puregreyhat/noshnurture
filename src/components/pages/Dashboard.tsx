@@ -77,6 +77,13 @@ export default function FoodDashboard() {
     }
   }, [user, previousUser]);
 
+  // Auto-enable all recipes for admin user
+  useEffect(() => {
+    if (user?.email === 'puregreyhat@gmail.com') {
+      setShowAllRecipes(true);
+    }
+  }, [user]);
+
   // Fetch inventory from Supabase and recently consumed items (for waste calculations)
   useEffect(() => {
     const fetchInventory = async () => {

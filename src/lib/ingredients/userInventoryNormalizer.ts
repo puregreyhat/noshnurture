@@ -8,7 +8,7 @@ export type CanonicalExpiry = { canonical: string; days_until_expiry: number };
  * This mirrors the token + canonical extraction logic used in the recipe detail page
  * so both list and detail views use the same matching rules.
  */
-export async function normalizeInventoryItems(items: InventoryItemDB[]) : Promise<{
+export async function normalizeInventoryItems(items: InventoryItemDB[]): Promise<{
   available: Set<string>;
   canonicalExpiry: CanonicalExpiry[];
 }> {
@@ -39,9 +39,27 @@ export async function normalizeInventoryItems(items: InventoryItemDB[]) : Promis
       }
     }
 
+    // Calculate dynamic days_until_expiry
+    let daysUntilExpiry = 0;
+    if (item.expiry_date) {
+      try {
+        const separator = item.expiry_date.includes('/') ? '/' : '-';
+        const [day, month, year] = item.expiry_date.split(separator).map(Number);
+        const exp = new Date(year, month - 1, day);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        exp.setHours(0, 0, 0, 0);
+        daysUntilExpiry = Math.floor((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      } catch {
+        daysUntilExpiry = Number(item.days_until_expiry || 0);
+      }
+    } else {
+      daysUntilExpiry = Number(item.days_until_expiry || 0);
+    }
+
     if (canonical) {
       available.add(canonical);
-      canonicalExpiry.push({ canonical, days_until_expiry: Number(item.days_until_expiry || 0) });
+      canonicalExpiry.push({ canonical, days_until_expiry: daysUntilExpiry });
     }
 
     // 3) Also include plain tag strings (non-canonical) as additional tokens
