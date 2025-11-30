@@ -5,13 +5,19 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { sendExpiryReminderEmail } from '@/lib/email/resend';
-import { sendExpiryReminder } from '@/lib/telegram/bot';
 
 // Runtime config for Edge Functions
 export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
+
+export async function GET(request: Request) {
+  return NextResponse.json({ message: 'Cron job disabled' }, { status: 200 });
+}
+
+/*
+import { createClient } from '@supabase/supabase-js';
+import { sendExpiryReminderEmail } from '@/lib/email/resend';
+import { sendExpiryReminder } from '@/lib/telegram/bot';
 
 interface UserItems {
   userId: string;
@@ -25,9 +31,6 @@ interface UserItems {
   }>;
 }
 
-/**
- * Calculate days until expiry dynamically
- */
 function calculateDaysUntilExpiry(expiryDate: string): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -208,3 +211,4 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+*/

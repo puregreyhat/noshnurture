@@ -16,6 +16,27 @@ export async function normalizeInventoryItems(items: InventoryItemDB[]): Promise
   const canonicalExpiry: CanonicalExpiry[] = [];
 
   for (const item of items) {
+    // Calculate dynamic days_until_expiry
+    let daysUntilExpiry = 0;
+    if (item.expiry_date) {
+      try {
+        const separator = item.expiry_date.includes('/') ? '/' : '-';
+        const [day, month, year] = item.expiry_date.split(separator).map(Number);
+        const exp = new Date(year, month - 1, day);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        exp.setHours(0, 0, 0, 0);
+        daysUntilExpiry = Math.floor((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      } catch {
+        daysUntilExpiry = Number(item.days_until_expiry || 0);
+      }
+    } else {
+      daysUntilExpiry = Number(item.days_until_expiry || 0);
+    }
+
+    // Skip expired items
+    if (daysUntilExpiry < 0) continue;
+
     const raw = String(item.product_name || '');
 
     // 1) Prefer explicit canonical tags if present
@@ -37,24 +58,6 @@ export async function normalizeInventoryItems(items: InventoryItemDB[]): Promise
       } catch {
         canonical = raw.toLowerCase().trim() || null;
       }
-    }
-
-    // Calculate dynamic days_until_expiry
-    let daysUntilExpiry = 0;
-    if (item.expiry_date) {
-      try {
-        const separator = item.expiry_date.includes('/') ? '/' : '-';
-        const [day, month, year] = item.expiry_date.split(separator).map(Number);
-        const exp = new Date(year, month - 1, day);
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        exp.setHours(0, 0, 0, 0);
-        daysUntilExpiry = Math.floor((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      } catch {
-        daysUntilExpiry = Number(item.days_until_expiry || 0);
-      }
-    } else {
-      daysUntilExpiry = Number(item.days_until_expiry || 0);
     }
 
     if (canonical) {

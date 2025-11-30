@@ -13,9 +13,32 @@ interface ExpiryAlertProps {
 export function ExpiryAlert({ items }: ExpiryAlertProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  const calculateDaysUntilExpiry = (expiryDate: string): number => {
+    if (!expiryDate) return 0;
+    try {
+      // Handle both DD/MM/YYYY and DD-MM-YYYY formats
+      const separator = expiryDate.includes('/') ? '/' : '-';
+      const [day, month, year] = expiryDate.split(separator).map(Number);
+
+      const exp = new Date(year, month - 1, day);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      exp.setHours(0, 0, 0, 0);
+
+      return Math.floor((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    } catch (e) {
+      console.error('Error parsing expiry date:', expiryDate, e);
+      return 0;
+    }
+  };
+
   // Get items expiring within 3 days (days_until_expiry = 0, 1, 2 or 3)
-  const expiringItems = items.filter((item) => {
-    const d = typeof item.days_until_expiry === "number" ? item.days_until_expiry : Infinity;
+  // AND ensure we don't show expired items (days < 0)
+  const expiringItems = items.map(item => ({
+    ...item,
+    days_until_expiry: calculateDaysUntilExpiry(item.expiry_date)
+  })).filter((item) => {
+    const d = item.days_until_expiry;
     return d >= 0 && d <= 3;
   });
 
@@ -48,7 +71,7 @@ export function ExpiryAlert({ items }: ExpiryAlertProps) {
             onClick={() => {
               try {
                 if (typeof window !== "undefined") sessionStorage.setItem("expiryAlertDismissed", "true");
-              } catch {}
+              } catch { }
               setIsOpen(false);
             }}
             className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
@@ -95,23 +118,22 @@ export function ExpiryAlert({ items }: ExpiryAlertProps) {
                           <div className="flex items-center gap-2 mt-2">
                             <Clock className="w-4 h-4 text-orange-600" />
                             <span
-                              className={`text-sm font-semibold ${
-                                item.days_until_expiry === 0
+                              className={`text-sm font-semibold ${item.days_until_expiry === 0
                                   ? "text-red-600"
                                   : item.days_until_expiry === 1
-                                  ? "text-orange-600"
-                                  : item.days_until_expiry === 2
-                                  ? "text-yellow-600"
-                                  : "text-amber-600"
-                              }`}
+                                    ? "text-orange-600"
+                                    : item.days_until_expiry === 2
+                                      ? "text-yellow-600"
+                                      : "text-amber-600"
+                                }`}
                             >
                               {item.days_until_expiry === 0
                                 ? "🔴 Expires Today"
                                 : item.days_until_expiry === 1
-                                ? "🟠 Expires Tomorrow"
-                                : item.days_until_expiry === 2
-                                ? "🟡 Expires in 2 days"
-                                : `🟡 Expires in ${item.days_until_expiry} days`}
+                                  ? "🟠 Expires Tomorrow"
+                                  : item.days_until_expiry === 2
+                                    ? "🟡 Expires in 2 days"
+                                    : `🟡 Expires in ${item.days_until_expiry} days`}
                             </span>
                           </div>
                         </div>
@@ -149,7 +171,7 @@ export function ExpiryAlert({ items }: ExpiryAlertProps) {
                       }
                       try {
                         if (typeof window !== "undefined") sessionStorage.setItem("expiryAlertDismissed", "true");
-                      } catch {}
+                      } catch { }
                       setIsOpen(false);
                     }}
                     className="inline-flex justify-center items-center w-full px-4 py-2 rounded-lg font-semibold text-white bg-green-600 hover:bg-green-700 transition-all"
@@ -168,7 +190,7 @@ export function ExpiryAlert({ items }: ExpiryAlertProps) {
                     onClick={() => {
                       try {
                         if (typeof window !== "undefined") sessionStorage.setItem("expiryAlertDismissed", "true");
-                      } catch {}
+                      } catch { }
                       setIsOpen(false);
                     }}
                     className="inline-flex justify-center items-center w-full px-4 py-2 rounded-lg font-semibold text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 transition-colors"

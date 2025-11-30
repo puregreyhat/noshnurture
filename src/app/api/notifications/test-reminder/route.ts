@@ -91,7 +91,7 @@ export async function POST(request: Request) {
         ...item,
         days_until_expiry: calculateDaysUntilExpiry(item.expiry_date),
       }))
-      .filter(item => 
+      .filter(item =>
         item.days_until_expiry >= -1 && item.days_until_expiry <= 7 // Include today and expired yesterday
       );
 
@@ -118,12 +118,12 @@ export async function POST(request: Request) {
     const enableTelegram = preferences?.enable_telegram ?? false;
     const telegramChatId = preferences?.telegram_chat_id;
 
-    console.log('[Test Reminder] Full Preferences:', { 
-      enableEmail, 
-      enableTelegram, 
+    console.log('[Test Reminder] Full Preferences:', {
+      enableEmail,
+      enableTelegram,
       telegramChatId,
       prefError: prefError?.code,
-      userEmail: user.email 
+      userEmail: user.email
     });
 
     let emailsSent = 0;
@@ -133,20 +133,41 @@ export async function POST(request: Request) {
     // Send Email if enabled
     if (enableEmail && user.email) {
       console.log('[Test Reminder] ATTEMPTING EMAIL to:', user.email, 'Items:', relevantItems.length);
+
+      if (!process.env.RESEND_API_KEY) {
+        console.error('[Test Reminder] MISSING RESEND_API_KEY');
+        return NextResponse.json({
+          error: 'Email service configuration missing (RESEND_API_KEY)',
+          stats: { emailsSent: 0, telegramSent: 0 }
+        }, { status: 500 });
+      }
+
       const result = await sendExpiryReminderEmail({
         to: user.email,
         userName,
         items: relevantItems,
       });
       console.log('[Test Reminder] Email result:', result);
+
       if (result.success) {
         emailsSent = 1;
         console.log('[Test Reminder] ✓ Email marked as sent');
       } else {
         console.log('[Test Reminder] ✗ Email failed:', result);
+        // Return error immediately to UI for visibility
+        return NextResponse.json({
+          error: `Email failed: ${result.error || 'Unknown error'}`,
+          stats: { emailsSent: 0, telegramSent: 0 }
+        }, { status: 500 });
       }
     } else {
       console.log('[Test Reminder] EMAIL SKIPPED:', { enableEmail, hasEmail: !!user.email });
+      if (!enableEmail) {
+        return NextResponse.json({
+          error: 'Email notifications are disabled in settings',
+          stats: { emailsSent: 0, telegramSent: 0 }
+        }, { status: 400 });
+      }
     }
 
     // Send Telegram if enabled and connected
