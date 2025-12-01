@@ -11,7 +11,7 @@
  * 4. Bot will respond!
  */
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8487060397:AAH3fN05g3bObS6o1lQkVktGxutJTiTdiz4';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8487060397:AAGSPR8COBuvAQ0Db_Xq_UVFw4bcBnCByRI';
 const BASE_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 let lastUpdateId = 0;
@@ -38,7 +38,7 @@ async function sendMessage(chatId, text, options = {}) {
       console.error('❌ Telegram API error:', data);
       return null;
     }
-    
+
     console.log('✅ Message sent successfully');
     return data.result;
   } catch (error) {
@@ -50,16 +50,16 @@ async function sendMessage(chatId, text, options = {}) {
 // Get updates (polling)
 async function getUpdates() {
   const url = `${BASE_URL}/getUpdates?offset=${lastUpdateId + 1}&timeout=30`;
-  
+
   try {
     const response = await fetch(url);
     const data = await response.json();
-    
+
     if (!data.ok) {
       console.error('❌ Failed to get updates:', data);
       return [];
     }
-    
+
     return data.result;
   } catch (error) {
     console.error('❌ Error polling updates:', error);
@@ -88,11 +88,11 @@ async function handleMessage(message) {
     welcomeMessage += `• 🍳 Recipe suggestions\n`;
     welcomeMessage += `• 💡 Smart cooking tips\n\n`;
     welcomeMessage += `Your Chat ID: \`${chatId}\`\n`;
-    
+
     if (userId) {
       welcomeMessage += `User ID: \`${userId}\`\n\n`;
       welcomeMessage += `✅ Account linked successfully!\n`;
-      
+
       // TODO: In production, save this to your database
       console.log('🔗 Would save to database:', { userId, chatId });
     } else {
@@ -114,7 +114,7 @@ async function handleMessage(message) {
       `/status - Check connection status\n` +
       `/help - Show this help message\n\n` +
       `Need more help? Visit noshnurture.vercel.app`;
-    
+
     await sendMessage(chatId, helpMessage);
   }
   // Handle /status command
@@ -124,7 +124,7 @@ async function handleMessage(message) {
       `Chat ID: \`${chatId}\`\n` +
       `Name: ${firstName}\n\n` +
       `To link your account, use /start from the Settings page.`;
-    
+
     await sendMessage(chatId, statusMessage);
   }
   // Handle unknown commands
@@ -133,7 +133,7 @@ async function handleMessage(message) {
       `/start - Connect account\n` +
       `/help - Show help\n` +
       `/status - Check status`;
-    
+
     await sendMessage(chatId, unknownMessage);
   }
 }
@@ -147,15 +147,15 @@ async function startPolling() {
   while (true) {
     try {
       const updates = await getUpdates();
-      
+
       for (const update of updates) {
         lastUpdateId = update.update_id;
-        
+
         if (update.message) {
           await handleMessage(update.message);
         }
       }
-      
+
       // Small delay to avoid hammering the API
       await new Promise(resolve => setTimeout(resolve, 100));
     } catch (error) {
@@ -168,11 +168,11 @@ async function startPolling() {
 // Test bot connection
 async function testBot() {
   console.log('🧪 Testing bot connection...');
-  
+
   const url = `${BASE_URL}/getMe`;
   const response = await fetch(url);
   const data = await response.json();
-  
+
   if (data.ok) {
     console.log('✅ Bot connected:', data.result.username);
     console.log('   First name:', data.result.first_name);
@@ -191,7 +191,7 @@ async function testBot() {
     console.error('\n❌ Failed to connect to Telegram bot. Check your TELEGRAM_BOT_TOKEN.');
     process.exit(1);
   }
-  
+
   console.log('\n');
   await startPolling();
 })();

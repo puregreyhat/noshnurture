@@ -10,7 +10,7 @@
  * 3. Look for "chat":{"id":123456789}
  */
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8487060397:AAH3fN05g3bObS6o1lQkVktGxutJTiTdiz4';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8487060397:AAGSPR8COBuvAQ0Db_Xq_UVFw4bcBnCByRI';
 const BASE_URL = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 // Get chat ID from command line
@@ -35,7 +35,7 @@ async function testBot() {
   console.log('1️⃣ Testing bot connection...');
   const meResponse = await fetch(`${BASE_URL}/getMe`);
   const meData = await meResponse.json();
-  
+
   if (meData.ok) {
     console.log('✅ Bot connected:', meData.result.username);
     console.log('   Bot name:', meData.result.first_name);
@@ -55,9 +55,9 @@ async function testBot() {
       parse_mode: 'Markdown',
     }),
   });
-  
+
   const messageData = await messageResponse.json();
-  
+
   if (messageData.ok) {
     console.log('✅ Test message sent successfully!');
     console.log('   Message ID:', messageData.result.message_id);
@@ -82,9 +82,9 @@ async function testBot() {
       }
     }),
   });
-  
+
   const buttonData = await buttonResponse.json();
-  
+
   if (buttonData.ok) {
     console.log('✅ Button message sent successfully!');
   } else {
@@ -93,7 +93,7 @@ async function testBot() {
 
   // Test 4: Send expiry reminder sample
   console.log('\n4️⃣ Sending sample expiry reminder...');
-  
+
   const expiryMessage = `🍲 *NoshNurture Reminder*
 
 Hi there! 👋
@@ -129,9 +129,9 @@ Here are items that need your attention:
       }
     }),
   });
-  
+
   const expiryData = await expiryResponse.json();
-  
+
   if (expiryData.ok) {
     console.log('✅ Expiry reminder sent successfully!');
   } else {
@@ -140,7 +140,7 @@ Here are items that need your attention:
 
   // Test 5: Send recipe suggestions sample
   console.log('\n5️⃣ Sending sample recipe suggestions...');
-  
+
   const recipeMessage = `🍳 *Recipe Suggestions Available!*
 
 Hi there! 👋
@@ -171,9 +171,9 @@ You can now make *15 recipes* with items in your inventory!
       }
     }),
   });
-  
+
   const recipeData = await recipeResponse.json();
-  
+
   if (recipeData.ok) {
     console.log('✅ Recipe suggestions sent successfully!');
   } else {
