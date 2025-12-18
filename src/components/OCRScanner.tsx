@@ -3,6 +3,8 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, Loader2, X, CheckCircle } from 'lucide-react';
 import { extractExpiryFromImage, imageToBase64 } from '@/lib/gemini-service';
+import { detectBarcodeInImage, base64ToFile } from '@/lib/barcode-service';
+import { getProductByBarcode, OFFProduct } from '@/lib/openfoodfacts-service';
 
 interface OCRScannerProps {
   onExpiryDetected: (data: {
@@ -10,6 +12,7 @@ interface OCRScannerProps {
     productName: string | null;
     batchNumber: string | null;
     confidence: number;
+    quantity?: string | null;
   }) => void;
   onClose: () => void;
 }
@@ -21,40 +24,122 @@ export default function OCRScanner({ onExpiryDetected, onClose }: OCRScannerProp
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const delayTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const currentStepRef = useRef<CaptureStep>('initial'); // Track which step we're on when file is selected
 
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // New state tracking
+  const [mode, setMode] = useState<'selection' | 'barcode' | 'ocr'>('selection');
   const [step, setStep] = useState<CaptureStep>('initial');
+
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isInitializingCamera, setIsInitializingCamera] = useState(false); // Track if user clicked camera button
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [isInitializingCamera, setIsInitializingCamera] = useState(false);
 
-  // Store both images for combined processing
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [frontImage, setFrontImage] = useState<string | null>(null);
   const [labelImage, setLabelImage] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState('');
 
-  // Track current step in ref for use in file selection handler
+  // Barcode specific
+  const [scannedProduct, setScannedProduct] = useState<OFFProduct | null>(null);
+  const [isScanningBarcode, setIsScanningBarcode] = useState(false);
+
+  // Clean up timer on unmount
   useEffect(() => {
-    currentStepRef.current = step;
-  }, [step]);
+    return () => {
+      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
+      stopCamera();
+    };
+  }, []);
+
+  // Effect to re-attach stream to video element when video element might have been re-created due to conditional rendering
+  useEffect(() => {
+    if (isCameraActive && videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+    }
+  }, [isCameraActive, step, mode, previewImage]);
+
+  // Live Barcode Scanning
+  useEffect(() => {
+    let scanInterval: NodeJS.Timeout;
+
+    const scanFrame = async () => {
+      if (mode === 'barcode' && isCameraActive && videoRef.current && canvasRef.current && !scannedProduct && !previewImage) {
+        try {
+          const ctx = canvasRef.current.getContext('2d');
+          if (ctx && videoRef.current.videoWidth > 0) {
+            canvasRef.current.width = videoRef.current.videoWidth;
+            canvasRef.current.height = videoRef.current.videoHeight;
+            ctx.drawImage(videoRef.current, 0, 0);
+
+            const dataUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
+            const file = base64ToFile(dataUrl);
+
+            // Attempt scan
+            const code = await detectBarcodeInImage(file);
+            if (code) {
+              setIsScanningBarcode(true);
+              const product = await getProductByBarcode(code);
+              // Store stream before unmounting
+              // Actually we keep streamRef, so we don't need to do anything specific
+
+              if (product) {
+                setScannedProduct(product);
+                setLoadingMessage(`✨ Found: ${product.product_name || 'Product'}`);
+                // Auto transition to next step
+                setTimeout(() => {
+                  setStep('label');
+                  setMode('ocr'); // Switch to standard capture for label
+                  setFrontImage(dataUrl); // Use this frame as front image
+                  setIsScanningBarcode(false);
+                }, 1500);
+              } else {
+                setScannedProduct({ code, product_name: 'Unknown Product', quantity: '' });
+                setLoadingMessage(`Barcode detected: ${code}`);
+                setTimeout(() => {
+                  setStep('label');
+                  setMode('ocr');
+                  setFrontImage(dataUrl);
+                  setIsScanningBarcode(false);
+                }, 1500);
+              }
+            }
+          }
+        } catch (e) {
+          // Silent fail for frame scan
+        }
+      }
+    };
+
+    if (mode === 'barcode' && isCameraActive) {
+      scanInterval = setInterval(scanFrame, 1000); // Scan every 1s to avoid UI freeze
+    }
+
+    return () => {
+      if (scanInterval) clearInterval(scanInterval);
+    };
+  }, [mode, isCameraActive, scannedProduct, previewImage]);
+
 
   const startCamera = async () => {
     try {
       setError(null);
-      setIsInitializingCamera(true); // User clicked camera button
-      setIsCameraActive(true); // Show camera loading state immediately
+      setIsInitializingCamera(true);
+      setIsCameraActive(true);
 
-      // Check if mediaDevices API is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setError('Camera not supported on this device. Please use gallery upload instead.');
-        setIsCameraActive(false);
+        throw new Error('Camera not supported');
+      }
+
+      // reuse existing stream if active
+      if (streamRef.current && streamRef.current.active) {
+        if (videoRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+        }
         return;
       }
 
-      // Request camera permission
-      // On Android/iOS, this will show a permission popup
       const constraints = {
         video: {
           facingMode: 'environment',
@@ -65,550 +150,318 @@ export default function OCRScanner({ onExpiryDetected, onClose }: OCRScannerProp
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
-
+      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        // Video is now playing - isCameraActive is already true
       }
     } catch (err: any) {
-      setIsCameraActive(false); // Hide camera on error
-      setIsInitializingCamera(false); // Reset camera initialization flag
-      const errorMessage = err?.name || err?.message || String(err);
-
-      // Handle specific error types
-      if (errorMessage.includes('NotAllowedError') || errorMessage === 'NotAllowedError') {
-        setError('📱 Camera permission denied. Please:\n1. Open Settings\n2. Find NoshNurture app\n3. Allow Camera permission');
-      } else if (errorMessage.includes('NotFoundError') || errorMessage === 'NotFoundError') {
-        setError('No camera found on this device. Please use gallery upload instead.');
-      } else if (errorMessage.includes('NotReadableError') || errorMessage === 'NotReadableError') {
-        setError('Camera is already in use by another app. Please close other apps and try again.');
-      } else if (errorMessage.includes('OverconstrainedError') || errorMessage === 'OverconstrainedError') {
-        // Fallback to basic constraints if advanced constraints fail
-        try {
-          const basicStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-          if (videoRef.current) {
-            videoRef.current.srcObject = basicStream;
-            // isCameraActive is already true from initial call
-          }
-        } catch (fallbackErr) {
-          setIsCameraActive(false);
-          setIsInitializingCamera(false);
-          setError('Unable to access camera. Please use gallery upload instead.');
-          console.error('Fallback camera error:', fallbackErr);
-        }
-      } else {
-        setIsCameraActive(false);
-        setIsInitializingCamera(false);
-        setError('Unable to access camera. Please ensure you:\n1. Granted camera permission\n2. Are using HTTPS or localhost\n3. Try using gallery upload instead');
-      }
-
-      console.error('Camera error details:', err);
+      setIsCameraActive(false);
+      setIsInitializingCamera(false);
+      setError('Unable to access camera. Please check permissions.');
     }
   };
 
   const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks();
-      tracks.forEach((track) => track.stop());
-      setIsCameraActive(false);
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
   };
 
   const capturePhoto = () => {
     if (canvasRef.current && videoRef.current) {
       const ctx = canvasRef.current.getContext('2d');
       if (ctx) {
-        canvasRef.current.width = videoRef.current.videoWidth;
-        canvasRef.current.height = videoRef.current.videoHeight;
-        ctx.drawImage(videoRef.current, 0, 0);
-
-        const imageData = canvasRef.current.toDataURL('image/jpeg');
-        setPreviewImage(imageData);
-        stopCamera();
+        // Ensure accurate dims
+        if (videoRef.current.videoWidth) {
+          canvasRef.current.width = videoRef.current.videoWidth;
+          canvasRef.current.height = videoRef.current.videoHeight;
+          ctx.drawImage(videoRef.current, 0, 0);
+          const imageData = canvasRef.current.toDataURL('image/jpeg');
+          setPreviewImage(imageData);
+          // We do NOT stop camera here immediately if we want to potentially retake quickly? 
+          // Logic says: preview phase -> retake calls startCamera.
+          stopCamera();
+        }
       }
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) {
-      console.error('No file selected');
-      return;
-    }
-
-    console.log('File selected:', file.name, 'Current step:', currentStepRef.current);
+    if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = async (event) => {
+    reader.onload = (event) => {
       const imageData = event.target?.result as string;
-      console.log('File loaded, setting preview image');
       setPreviewImage(imageData);
-      // Set step based on current step: if on 'initial', go to 'front'; if on 'label', stay on 'label'
-      if (currentStepRef.current === 'initial') {
-        console.log('Setting step to front');
-        setStep('front');
-      } else {
-        console.log('Staying on step:', currentStepRef.current);
+      // Determine what to do based on step
+      if (mode === 'barcode') {
+        // If uploaded in barcode mode, check it immediately
+        checkUploadedBarcode(imageData);
       }
-      // If on 'label', don't change step - the preview will automatically show because previewImage is set
     };
     reader.readAsDataURL(file);
-
-    // Clear the file input so the same file can be selected again
     e.target.value = '';
   };
 
-  const confirmFrontImage = async () => {
-    if (!previewImage) return;
-
-    setFrontImage(previewImage);
-    setPreviewImage(null);
-    setStep('label');
-
-    // Show loading message for 3 seconds
-    setLoadingMessage('Image attached to AI ✓');
-    if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
-
-    delayTimerRef.current = setTimeout(() => {
+  const checkUploadedBarcode = async (base64: string) => {
+    setLoadingMessage('Checking barcode...');
+    try {
+      const file = base64ToFile(base64);
+      const code = await detectBarcodeInImage(file);
+      if (code) {
+        const product = await getProductByBarcode(code);
+        if (product) {
+          setScannedProduct(product);
+          setLoadingMessage(`✨ Found: ${product.product_name}`);
+          setTimeout(() => {
+            setFrontImage(base64);
+            setStep('label');
+            setMode('ocr');
+            setPreviewImage(null);
+          }, 1500);
+          return;
+        }
+      }
+      setError("No barcode found in image. Please try 'Scanner' mode or standard photo.");
       setLoadingMessage('');
-      setError(null);
-    }, 3000);
+    } catch (e) {
+      setError("Failed to read barcode");
+      setLoadingMessage('');
+    }
+  };
+
+  const confirmFrontImage = () => {
+    if (previewImage) {
+      setFrontImage(previewImage);
+      setPreviewImage(null);
+      setStep('label');
+    }
   };
 
   const confirmLabelImage = async () => {
     if (!previewImage) return;
-
     setLabelImage(previewImage);
     setPreviewImage(null);
     setStep('processing');
-
-    // Process both images together
     await processImages(frontImage, previewImage);
   };
 
   const processImages = async (frontImg: string | null, labelImg: string | null) => {
-    if (!frontImg || !labelImg) return;
+    if (!labelImg) return; // Front image might be skipped or implicit in barcode mode
 
     try {
       setIsLoading(true);
       setError(null);
-      setLoadingMessage('Processing product label & expiry date...');
+      setLoadingMessage('Reading expiry date...');
 
-      // Extract base64 from both images
-      const frontBase64 = frontImg.split(',')[1];
       const labelBase64 = labelImg.split(',')[1];
-
-      // Process label image for expiry date
       const result = await extractExpiryFromImage(labelBase64);
 
-      // If no product name from label, try to get it from front image
-      let productName = result.productName;
-      if (!productName) {
+      let productName = scannedProduct?.product_name || result.productName;
+      let quantity = scannedProduct?.quantity || null;
+
+      // If still no name, try front image OCR if available
+      if (!productName && frontImg) {
+        setLoadingMessage('Reading product name...');
+        const frontBase64 = frontImg.split(',')[1];
         const frontResult = await extractExpiryFromImage(frontBase64);
         productName = frontResult.productName;
       }
 
       if (!result.expiryDate) {
-        setError('Could not detect expiry date. Please try again with clearer images.');
-        resetCapture();
+        setError('Could not detect expiry date. Please provide a clearer image of the date.');
+        setStep('label'); // Go back to label capture
         return;
       }
 
-      // Success - pass data to parent
       onExpiryDetected({
         expiryDate: result.expiryDate,
         productName: productName || 'Unknown Product',
         batchNumber: result.batchNumber,
         confidence: result.confidence,
+        quantity: quantity
       });
 
-      // Auto close after success
-      setTimeout(() => onClose(), 500);
-    } catch (err) {
-      console.error('Processing error:', err);
-      setError('Failed to process images. Please try again.');
-      resetCapture();
+      setTimeout(onClose, 500);
+
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Processing failed. Please try again.');
+      setStep('label');
     } finally {
       setIsLoading(false);
       setLoadingMessage('');
     }
   };
 
-  const resetCapture = () => {
-    setStep('front');
-    setFrontImage(null);
-    setLabelImage(null);
-    setPreviewImage(null);
-    setLoadingMessage('');
-    setIsInitializingCamera(false);
-  };
-
   const resetAll = () => {
+    setMode('selection');
     setStep('initial');
     setFrontImage(null);
     setLabelImage(null);
     setPreviewImage(null);
+    setScannedProduct(null);
     setError(null);
     setLoadingMessage('');
-    setIsInitializingCamera(false);
-    if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
+    stopCamera();
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-4">
-      <div className="bg-[#FDFBF7] rounded-none md:rounded-3xl max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h2 className="text-2xl font-serif font-bold text-stone-800">Smart Label Scanner</h2>
-            <p className="text-sm text-stone-500 mt-1">
-              {step === 'initial' && '2-step scanning'}
-              {step === 'front' && 'Step 1 of 2: Product Name'}
-              {step === 'label' && 'Step 2 of 2: Expiry Date'}
-              {step === 'processing' && 'Processing...'}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-stone-100 rounded-xl text-stone-500 transition-colors"
-          >
-            <X size={24} />
-          </button>
-        </div>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-0 md:p-4">
+      <div className="bg-[#FDFBF7] rounded-none md:rounded-3xl max-w-2xl w-full h-full md:h-auto md:max-h-[90vh] overflow-y-auto p-6 md:p-8 shadow-2xl relative">
+        <button onClick={onClose} className="absolute top-4 right-4 p-2 hover:bg-stone-100 rounded-full text-stone-500">
+          <X size={24} />
+        </button>
 
-        {/* STEP 0: Initial menu */}
-        {step === 'initial' && !frontImage && !previewImage && (
-          <div className="space-y-4">
-            <div className="bg-emerald-50 rounded-2xl p-6 border-2 border-emerald-100">
-              <h3 className="font-serif font-semibold text-emerald-900 mb-3 text-lg">📸 How it works</h3>
-              <ol className="text-sm text-emerald-800 space-y-2 list-decimal list-inside">
-                <li><strong>Front side:</strong> Photo showing product name</li>
-                <li><strong>Loading:</strong> 3 seconds while AI processes</li>
-                <li><strong>Label side:</strong> Photo with expiry & mfg date</li>
-                <li><strong>Done:</strong> Product added to inventory!</li>
-              </ol>
-            </div>
+        <h2 className="text-2xl font-serif font-bold text-stone-800 mb-2">Add Product</h2>
 
-            <button
-              onClick={() => {
-                setStep('front');
-                startCamera();
-              }}
-              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-semibold flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
-            >
-              <Camera size={22} />
-              📷 Take Photos with Camera
+        {/* SELECTION MODE */}
+        {mode === 'selection' && (
+          <div className="space-y-4 mt-8">
+            <p className="text-stone-600 mb-6">Does the product have a barcode?</p>
+
+            <button onClick={() => { setMode('barcode'); setStep('front'); startCamera(); }}
+              className="w-full bg-emerald-600 text-white p-6 rounded-2xl flex flex-col items-center gap-2 hover:bg-emerald-700 transition-all">
+              <Camera size={32} />
+              <span className="font-bold text-lg">Yes, Scan Barcode</span>
+              <span className="text-emerald-100 text-sm">Fastest • Auto-fills Name & Weight</span>
             </button>
 
-            <div className="relative flex items-center gap-3">
-              <div className="flex-1 h-px bg-stone-200"></div>
-              <span className="text-sm text-stone-400 font-medium">or upload</span>
-              <div className="flex-1 h-px bg-stone-200"></div>
-            </div>
-
-            <button
-              onClick={() => {
-                fileInputRef.current?.click();
-              }}
-              className="w-full bg-white border-2 border-stone-200 text-stone-700 py-4 rounded-2xl font-semibold hover:border-amber-300 hover:bg-amber-50 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-3"
-            >
-              📁 Choose Photos from Gallery
+            <button onClick={() => { setMode('ocr'); setStep('front'); startCamera(); }}
+              className="w-full bg-white border-2 border-emerald-600 text-emerald-700 p-6 rounded-2xl flex flex-col items-center gap-2 hover:bg-emerald-50 transition-all">
+              <Camera size={32} />
+              <span className="font-bold text-lg">No, Scan Product Front</span>
+              <span className="text-emerald-600/70 text-sm">We'll read the text from the package</span>
             </button>
           </div>
         )}
 
-        {/* STEP 1: Capture front image */}
-        {step === 'front' && !frontImage && !previewImage && !isCameraActive && isInitializingCamera && (
+        {/* BARCODE MODE */}
+        {mode === 'barcode' && step === 'front' && (
           <div className="space-y-4">
-            <div className="bg-stone-50 rounded-2xl p-6 border-2 border-stone-200 text-center">
-              <Loader2 className="animate-spin mx-auto mb-3 text-emerald-600" size={28} />
-              <p className="text-base font-serif font-semibold text-stone-800">Starting Camera...</p>
-              <p className="text-sm text-stone-600 mt-2">Please allow camera access if prompted</p>
-            </div>
-            <button
-              onClick={() => {
-                stopCamera();
-                resetAll();
-              }}
-              className="w-full bg-stone-200 text-stone-800 py-3 rounded-2xl font-semibold hover:bg-stone-300 transition-all"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
-        {/* STEP 1: Capture front image */}
-        {step === 'front' && !frontImage && !previewImage && isCameraActive && (
-          <div className="space-y-4">
-            <div className="bg-emerald-50 rounded-2xl p-4 border-2 border-emerald-100">
-              <p className="text-base font-serif font-semibold text-emerald-900">📦 Step 1 of 2</p>
-              <p className="text-sm text-emerald-800 mt-2">
-                Show the <strong>front of the package</strong> with the <strong>product name</strong>
-              </p>
+            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-center">
+              <p className="text-emerald-800 font-medium">Point camera at barcode</p>
             </div>
 
-            <div className="relative w-full bg-black rounded-2xl overflow-hidden" style={{ aspectRatio: '4/3', minHeight: '300px' }}>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 border-4 border-emerald-400 rounded-2xl pointer-events-none">
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-400"></div>
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-400"></div>
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-400"></div>
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-400"></div>
+            <div className="relative w-full aspect-[4/3] bg-black rounded-2xl overflow-hidden">
+              {!isCameraActive && !previewImage && (
+                <div className="absolute inset-0 flex items-center justify-center text-white/50">
+                  <Loader2 className="animate-spin" />
+                </div>
+              )}
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+              <div className="absolute inset-0 border-2 border-emerald-500/50 flex items-center justify-center">
+                <div className="w-64 h-32 border-2 border-emerald-400 rounded-lg shadow-[0_0_0_999px_rgba(0,0,0,0.5)]"></div>
               </div>
+              {loadingMessage && (
+                <div className="absolute bottom-4 left-4 right-4 bg-black/60 text-white p-3 rounded-lg text-center backdrop-blur-sm">
+                  {loadingMessage}
+                </div>
+              )}
             </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={capturePhoto}
-                className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-semibold hover:bg-emerald-700 transition-all hover:scale-[1.02] active:scale-[0.98]"
-              >
-                Capture Front
+            <div className="flex gap-2">
+              <button onClick={() => fileInputRef.current?.click()} className="flex-1 py-3 text-stone-600 font-medium">
+                Upload Image
               </button>
-              <button
-                onClick={() => {
-                  stopCamera();
-                  resetAll();
-                }}
-                className="flex-1 bg-stone-200 text-stone-800 py-3 rounded-2xl font-semibold hover:bg-stone-300 transition-all"
-              >
+              <button onClick={resetAll} className="flex-1 py-3 text-red-500 font-medium">
                 Cancel
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 1: Preview front image */}
-        {step === 'front' && previewImage && !frontImage && (
+        {/* NORMAL / OCR MODE - FRONT */}
+        {mode === 'ocr' && step === 'front' && !previewImage && (
           <div className="space-y-4">
-            <div className="bg-emerald-50 rounded-2xl p-4 border-2 border-emerald-100">
-              <p className="text-base font-serif font-semibold text-emerald-900">📦 Step 1 of 2</p>
-              <p className="text-sm text-emerald-800 mt-2">
-                Does this show the <strong>product name clearly?</strong>
-              </p>
+            <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+              <p className="text-emerald-800">1. Take photo of <strong>Product Name</strong></p>
             </div>
-
-            <img
-              src={previewImage}
-              alt="Front preview"
-              className="w-full rounded-2xl max-h-64 object-cover shadow-lg"
-            />
-
+            <div className="relative w-full aspect-[4/3] bg-black rounded-2xl overflow-hidden">
+              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+            </div>
             <div className="flex gap-3">
-              <button
-                onClick={confirmFrontImage}
-                className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-semibold hover:bg-emerald-700 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <CheckCircle size={20} />
-                Confirm
-              </button>
-              <button
-                onClick={() => {
-                  setPreviewImage(null);
-                  startCamera();
-                }}
-                className="flex-1 bg-stone-200 text-stone-800 py-3 rounded-2xl font-semibold hover:bg-stone-300 transition-all"
-              >
-                Retake
-              </button>
+              <button onClick={capturePhoto} className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold">Capture</button>
+              <button onClick={resetAll} className="px-4 text-stone-500">Cancel</button>
             </div>
           </div>
         )}
 
-        {/* LOADING: Between front and label capture */}
-        {step === 'label' && !labelImage && !previewImage && (
+        {/* PREVIEW FRONT (Non-barcode mode only) */}
+        {mode === 'ocr' && step === 'front' && previewImage && (
           <div className="space-y-4">
-            <div className="bg-emerald-50 rounded-2xl p-6 border-2 border-emerald-100">
-              <div className="flex items-center gap-3 mb-4">
-                <CheckCircle size={24} className="text-emerald-600" />
-                <span className="font-serif font-semibold text-emerald-900 text-lg">Front image saved!</span>
+            <img src={previewImage} className="w-full rounded-2xl" />
+            <div className="flex gap-3">
+              <button onClick={confirmFrontImage} className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold">Use Photo</button>
+              <button onClick={() => { setPreviewImage(null); startCamera(); }} className="flex-1 bg-stone-200 py-3 rounded-xl">Retake</button>
+            </div>
+          </div>
+        )}
+
+        {/* LABEL STEP (Common) */}
+        {step === 'label' && !previewImage && (
+          <div className="space-y-4">
+            <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+              <p className="text-amber-800">2. Take photo of <strong>Expiry Date</strong></p>
+              {scannedProduct && <p className="text-xs text-amber-600 mt-1">Product: {scannedProduct.product_name}</p>}
+            </div>
+            {!isCameraActive && (
+              <div className="text-center py-8">
+                <button onClick={startCamera} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-medium">
+                  Start Camera for Expiry
+                </button>
               </div>
-              <p className="text-base text-emerald-800 mb-4">
-                {loadingMessage ? loadingMessage : 'Waiting to process next image...'}
-              </p>
-              {loadingMessage && (
-                <div className="w-full bg-emerald-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-emerald-600 h-full animate-pulse"></div>
-                </div>
-              )}
-            </div>
-
-            <button
-              onClick={() => startCamera()}
-              disabled={!!loadingMessage}
-              className="w-full bg-emerald-600 text-white py-4 rounded-2xl font-semibold flex items-center justify-center gap-3 hover:bg-emerald-700 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-            >
-              <Camera size={22} />
-              Take Photo of Expiry
-            </button>
-
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!!loadingMessage}
-              className="w-full bg-white border-2 border-stone-200 text-stone-700 py-4 rounded-2xl font-semibold hover:border-emerald-300 hover:bg-stone-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Choose from Gallery
-            </button>
-          </div>
-        )}
-
-        {/* STEP 2: Camera Loading State */}
-        {step === 'label' && !labelImage && !previewImage && !isCameraActive && isInitializingCamera && (
-          <div className="space-y-4">
-            <div className="bg-stone-50 rounded-2xl p-6 border-2 border-stone-200 text-center">
-              <Loader2 className="animate-spin mx-auto mb-3 text-emerald-600" size={28} />
-              <p className="text-base font-serif font-semibold text-stone-800">Starting Camera...</p>
-              <p className="text-sm text-stone-600 mt-2">Please allow camera access if prompted</p>
-            </div>
-            <button
-              onClick={() => {
-                stopCamera();
-                resetCapture();
-              }}
-              className="w-full bg-stone-200 text-stone-800 py-3 rounded-2xl font-semibold hover:bg-stone-300 transition-all"
-            >
-              Back
-            </button>
-          </div>
-        )}
-
-        {/* STEP 2: Capture label image (camera) */}
-        {step === 'label' && !labelImage && !previewImage && isCameraActive && (
-          <div className="space-y-4">
-            <div className="bg-emerald-50 rounded-2xl p-4 border-2 border-emerald-100">
-              <p className="text-base font-serif font-semibold text-emerald-900">📋 Step 2 of 2</p>
-              <p className="text-sm text-emerald-800 mt-2">
-                Show the label section with <strong>expiry date & manufacturing info</strong>
-              </p>
-            </div>
-
-            <div className="relative w-full bg-black rounded-2xl overflow-hidden" style={{ aspectRatio: '4/3', minHeight: '300px' }}>
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 border-4 border-emerald-400 rounded-2xl pointer-events-none">
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-emerald-400"></div>
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-emerald-400"></div>
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-emerald-400"></div>
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-emerald-400"></div>
+            )}
+            {isCameraActive && (
+              <div className="relative w-full aspect-[4/3] bg-black rounded-2xl overflow-hidden">
+                <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
               </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={capturePhoto}
-                className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-semibold hover:bg-emerald-700 transition-all hover:scale-[1.02] active:scale-[0.98]"
-              >
-                Capture Label
-              </button>
-              <button
-                onClick={() => {
-                  stopCamera();
-                  resetCapture();
-                }}
-                className="flex-1 bg-stone-200 text-stone-800 py-3 rounded-2xl font-semibold hover:bg-stone-300 transition-all"
-              >
-                Back
-              </button>
-            </div>
+            )}
+            {isCameraActive && (
+              <div className="flex gap-3">
+                <button onClick={capturePhoto} className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold">Capture Label</button>
+                <button onClick={() => { stopCamera(); setStep('initial'); setMode('selection'); }} className="px-4 text-stone-500">Cancel</button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* STEP 2: Preview label image */}
-        {step === 'label' && previewImage && !labelImage && (
+        {/* PREVIEW LABEL */}
+        {step === 'label' && previewImage && (
           <div className="space-y-4">
-            <div className="bg-emerald-50 rounded-2xl p-4 border-2 border-emerald-100">
-              <p className="text-base font-serif font-semibold text-emerald-900">📋 Step 2 of 2</p>
-              <p className="text-sm text-emerald-800 mt-2">
-                Does this show <strong>expiry & mfg dates clearly?</strong>
-              </p>
-            </div>
-
-            <img
-              src={previewImage}
-              alt="Label preview"
-              className="w-full rounded-2xl max-h-64 object-cover shadow-lg"
-            />
-
+            <img src={previewImage} className="w-full rounded-2xl" />
             <div className="flex gap-3">
-              <button
-                onClick={confirmLabelImage}
-                disabled={isLoading}
-                className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-semibold hover:bg-emerald-700 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 size={20} className="animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle size={20} />
-                    Confirm & Process
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setPreviewImage(null);
-                  startCamera();
-                }}
-                disabled={isLoading}
-                className="flex-1 bg-stone-200 text-stone-800 py-3 rounded-2xl font-semibold hover:bg-stone-300 transition-all disabled:opacity-50"
-              >
-                Retake
-              </button>
+              <button onClick={confirmLabelImage} className="flex-1 bg-emerald-600 text-white py-3 rounded-xl font-bold">Process</button>
+              <button onClick={() => { setPreviewImage(null); startCamera(); }} className="flex-1 bg-stone-200 py-3 rounded-xl">Retake</button>
             </div>
           </div>
         )}
 
-        {/* Processing state */}
-        {step === 'processing' && isLoading && (
-          <div className="space-y-4">
-            <div className="bg-emerald-50 rounded-2xl p-8 flex flex-col items-center gap-4 border-2 border-emerald-100">
-              <Loader2 className="animate-spin text-emerald-600" size={40} />
-              <p className="text-base text-emerald-800 font-serif font-semibold">Analyzing images...</p>
-              <p className="text-sm text-emerald-700 text-center">
-                Detecting product name and expiry date
-              </p>
-            </div>
+        {/* PROCESSING */}
+        {step === 'processing' && (
+          <div className="text-center py-12 space-y-4">
+            <Loader2 className="animate-spin w-12 h-12 text-emerald-600 mx-auto" />
+            <p className="text-stone-600">{loadingMessage}</p>
           </div>
         )}
 
-        {/* Error display */}
+        {/* ERROR */}
         {error && (
-          <div className="bg-red-50 rounded-2xl p-6 border-2 border-red-200 space-y-4">
-            <p className="text-base text-red-800 font-semibold">{error}</p>
-            <button
-              onClick={() => {
-                resetAll();
-              }}
-              className="w-full bg-red-600 text-white py-3 rounded-2xl font-semibold hover:bg-red-700 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            >
-              Start Over
-            </button>
+          <div className="bg-red-50 p-4 rounded-xl border border-red-100 text-red-600 mb-4 flex justify-between items-center">
+            <span>{error}</span>
+            <button onClick={() => setError(null)}><X size={18} /></button>
           </div>
         )}
 
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
         <canvas ref={canvasRef} className="hidden" />
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
       </div>
     </div>
   );
 }
-

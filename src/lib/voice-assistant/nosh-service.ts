@@ -31,7 +31,7 @@ export async function detectIntent(userQuery: string): Promise<VoiceIntent> {
   }
 
   const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-  
+
   if (!apiKey) {
     console.error('Gemini API key not configured');
     throw new Error('Gemini API key not configured');
@@ -39,7 +39,7 @@ export async function detectIntent(userQuery: string): Promise<VoiceIntent> {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -113,21 +113,21 @@ Respond with ONLY the JSON object, no other text.`,
 
     const data = await response.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    
+
     console.log('Gemini raw response:', text.substring(0, 100));
-    
+
     // Extract JSON from response (handle markdown code blocks)
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const jsonStr = jsonMatch ? jsonMatch[0] : text;
-    
+
     const result = JSON.parse(jsonStr) as VoiceIntent;
-    
+
     // Ensure confidence is a number and within valid range
     if (typeof result.confidence !== 'number') {
       result.confidence = Number(result.confidence) || 0.5;
     }
     result.confidence = Math.max(0, Math.min(1, result.confidence));
-    
+
     // Log for debugging
     console.log('Intent detected from Gemini:', {
       query: userQuery,
@@ -135,19 +135,19 @@ Respond with ONLY the JSON object, no other text.`,
       confidence: result.confidence,
       parameters: result.parameters,
     });
-    
+
     // Cache the result
     intentCache.set(cacheKey, { result, timestamp: Date.now() });
-    
+
     return result;
 
   } catch (error) {
     console.error('Intent detection error:', error);
     console.log('Using keyword-based fallback for:', userQuery);
-    
+
     // Fallback: Use keyword matching for common patterns
     const queryLower = userQuery.toLowerCase();
-    
+
     if (queryLower.includes('expir') || queryLower.includes('bad') || queryLower.includes('spoil') || queryLower.includes('soon')) {
       const result = {
         intent: 'get_expiring_items' as const,
@@ -157,7 +157,7 @@ Respond with ONLY the JSON object, no other text.`,
       intentCache.set(cacheKey, { result, timestamp: Date.now() });
       return result;
     }
-    
+
     if (queryLower.includes('make') || queryLower.includes('cook') || queryLower.includes('prepare') || queryLower.includes('recipe')) {
       if (queryLower.includes('indian') || queryLower.includes('italian') || queryLower.includes('chinese') || queryLower.includes('thai') || queryLower.includes('mexican')) {
         const cuisineMatch = queryLower.match(/(indian|italian|chinese|thai|mexican|french)/);
@@ -177,7 +177,7 @@ Respond with ONLY the JSON object, no other text.`,
       intentCache.set(cacheKey, { result, timestamp: Date.now() });
       return result;
     }
-    
+
     if (queryLower.includes('inventory') || queryLower.includes('have') || queryLower.includes('items') || queryLower.includes('stock')) {
       const result = {
         intent: 'get_inventory' as const,
@@ -187,7 +187,7 @@ Respond with ONLY the JSON object, no other text.`,
       intentCache.set(cacheKey, { result, timestamp: Date.now() });
       return result;
     }
-    
+
     if (queryLower.includes('hi') || queryLower.includes('hello') || queryLower.includes('hey') || queryLower.includes('thanks') || queryLower.includes('thank')) {
       const result = {
         intent: 'smalltalk' as const,
@@ -197,7 +197,7 @@ Respond with ONLY the JSON object, no other text.`,
       intentCache.set(cacheKey, { result, timestamp: Date.now() });
       return result;
     }
-    
+
     const result = {
       intent: 'unknown' as const,
       parameters: {},
@@ -277,13 +277,13 @@ export function speakText(text: string) {
   utterance.rate = 0.95;
   utterance.pitch = 1.0;
   utterance.volume = 1.0;
-  
+
   // Use a pleasant voice if available
   const voices = window.speechSynthesis.getVoices();
-  const preferredVoice = voices.find(v => 
+  const preferredVoice = voices.find(v =>
     v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Female')
   );
-  
+
   if (preferredVoice) {
     utterance.voice = preferredVoice;
   }

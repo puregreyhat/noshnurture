@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Loader2,
+  ShoppingBag,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { normalizeIngredientName, normalizeIngredientNameWithScore, levenshtein } from '@/lib/ingredients/normalize';
@@ -219,6 +220,57 @@ export default function RecipePage() {
   }, [recipe, normalizedUserIngredients]);
 
   // Local automatic step translation removed — rely on Google Translate widget only.
+
+  const [addingToShoppingList, setAddingToShoppingList] = useState(false);
+
+  const handleAddToShoppingList = async () => {
+    if (!recipe) return;
+    setAddingToShoppingList(true);
+
+    try {
+      if (!user) {
+        addToast('⚠️ Please log in to manage shopping list', 'error');
+        setAddingToShoppingList(false);
+        return;
+      }
+
+      // Identify missing ingredients
+      const missingIngredients = recipe.extendedIngredients.filter(ing => !checkIngredientOwnership(ing.name));
+
+      if (missingIngredients.length === 0) {
+        addToast('✅ You have all ingredients!', 'success');
+        setAddingToShoppingList(false);
+        return;
+      }
+
+      const itemsToAdd = missingIngredients.map(ing => ({
+        item_name: ing.name,
+        quantity: ing.amount,
+        unit: ing.unit,
+        added_from: 'recipe',
+        recipe_id: String(recipe.id)
+      }));
+
+      const res = await fetch('/api/shopping-list/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: itemsToAdd,
+          recipe_id: String(recipe.id)
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to update list');
+
+      addToast(`🛒 Added ${itemsToAdd.length} missing items to shopping list`, 'success');
+
+    } catch (err) {
+      console.error(err);
+      addToast('❌ Failed to add items', 'error');
+    } finally {
+      setAddingToShoppingList(false);
+    }
+  };
 
   const handleMarkAsCooked = async () => {
     setCooking(true);
@@ -598,6 +650,27 @@ export default function RecipePage() {
                   />
                 </div>
               </div>
+
+              {/* Add Missing Ingredients Button */}
+              {ownedCount < totalCount && (
+                <div className="mb-6">
+                  <button
+                    onClick={handleAddToShoppingList}
+                    disabled={addingToShoppingList}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition-all font-medium shadow-md shadow-amber-100 mb-4"
+                  >
+                    {addingToShoppingList ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ShoppingBag className="w-5 h-5" />
+                    )}
+                    I want to prepare it
+                    <span className="text-xs font-normal opacity-90 ml-1">
+                      (Add missing)
+                    </span>
+                  </button>
+                </div>
+              )}
               <ul className="space-y-3">
                 {sortedIngredients.map((ingredient) => {
                   const owned = checkIngredientOwnership(ingredient.name);
@@ -756,10 +829,10 @@ export default function RecipePage() {
             <div
               key={toast.id}
               className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-lg backdrop-blur-xl border animate-in fade-in slide-in-from-right-4 ${toast.type === 'success'
-                  ? 'bg-emerald-800/90 border-emerald-700 text-white'
-                  : toast.type === 'error'
-                    ? 'bg-red-800/90 border-red-700 text-white'
-                    : 'bg-stone-800/90 border-stone-700 text-white'
+                ? 'bg-emerald-800/90 border-emerald-700 text-white'
+                : toast.type === 'error'
+                  ? 'bg-red-800/90 border-red-700 text-white'
+                  : 'bg-stone-800/90 border-stone-700 text-white'
                 }`}
             >
               <div className="flex-1 font-medium">{toast.content}</div>

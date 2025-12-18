@@ -10,6 +10,7 @@ export type RecipeSuggestion = {
   instructions: string[];
   score: number;
   cuisine?: string; // e.g., "Indian", "Italian", "East Asian"
+  diet?: string; // "Vegetarian" or "Non-Vegetarian"
   matchedIngredientCount?: number; // Number of ingredients you have
   totalIngredientCount?: number; // Total ingredients needed
 };
@@ -34,19 +35,19 @@ export const HERBS = new Set([
 ]);
 
 export const VEG = new Set([
-  "tomato","onion","garlic","ginger","potato","carrot","cabbage","cauliflower","spinach","lettuce","broccoli","bell pepper","capsicum","chili","green chili","pea","green pea","okra","eggplant","zucchini","cucumber","beetroot","radish","mushroom","corn","sweet corn",
+  "tomato", "onion", "garlic", "ginger", "potato", "carrot", "cabbage", "cauliflower", "spinach", "lettuce", "broccoli", "bell pepper", "capsicum", "chili", "green chili", "pea", "green pea", "okra", "eggplant", "zucchini", "cucumber", "beetroot", "radish", "mushroom", "corn", "sweet corn",
 ]);
 
 export const PROTEIN = new Set([
-  "egg","chicken","paneer","tofu","chickpea","lentil","dal","rajma","kidney bean","black bean","fish","prawn","shrimp",
+  "egg", "chicken", "paneer", "tofu", "chickpea", "lentil", "dal", "rajma", "kidney bean", "black bean", "fish", "prawn", "shrimp",
 ]);
 
 export const CARB = new Set([
-  "rice","bread","pasta","noodles","poha","vermicelli","quinoa","oats",
+  "rice", "bread", "pasta", "noodles", "poha", "vermicelli", "quinoa", "oats",
 ]);
 
 export const STAPLES = new Set([
-  "salt","sugar","oil","olive oil","mustard oil","turmeric","chili powder","garam masala","cumin","coriander powder","soy sauce","vinegar","lemon","lime","butter",
+  "salt", "sugar", "oil", "olive oil", "mustard oil", "turmeric", "chili powder", "garam masala", "cumin", "coriander powder", "soy sauce", "vinegar", "lemon", "lime", "butter",
 ]);
 
 export type TemplateContext = {
@@ -114,7 +115,7 @@ export function curryTemplate(ctx: TemplateContext): RecipeSuggestion | null {
 
   return {
     id: `curry-${used.join("-")}`,
-    title: `${(prot || vegs[0] || "Vegetable").toString().replace(/^./, c=>c.toUpperCase())} Curry`,
+    title: `${(prot || vegs[0] || "Vegetable").toString().replace(/^./, c => c.toUpperCase())} Curry`,
     image: "https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=800&auto=format&fit=crop",
     totalTime: 25,
     ingredients,
@@ -123,6 +124,7 @@ export function curryTemplate(ctx: TemplateContext): RecipeSuggestion | null {
     instructions,
     score: scoreByUsage(pantry, used),
     cuisine: "Indian",
+    diet: ["chicken", "egg", "fish", "prawn", "shrimp", "mutton"].includes(prot || "") ? "Non-Vegetarian" : "Vegetarian",
     matchedIngredientCount: used.length,
     totalIngredientCount: ingredients.length,
   };
@@ -157,7 +159,7 @@ export function stirFryTemplate(ctx: TemplateContext): RecipeSuggestion | null {
 
   return {
     id: `stirfry-${used.join("-")}`,
-    title: `${(carb || "Veg").toString().replace(/^./, c=>c.toUpperCase())} Stir-Fry`,
+    title: `${(carb || "Veg").toString().replace(/^./, c => c.toUpperCase())} Stir-Fry`,
     image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?w=800&auto=format&fit=crop",
     totalTime: 20,
     ingredients,
@@ -206,6 +208,7 @@ export function pastaTemplate(ctx: TemplateContext): RecipeSuggestion | null {
     instructions,
     score: scoreByUsage({ expiring: pantry.expiring, available: pantry.available }, used),
     cuisine: "Italian",
+    diet: "Vegetarian",
     matchedIngredientCount: used.length,
     totalIngredientCount: ingredients.length,
   };
@@ -286,7 +289,7 @@ export function friedRiceTemplate(ctx: TemplateContext): RecipeSuggestion | null
 export function saladTemplate(ctx: TemplateContext): RecipeSuggestion | null {
   const { pantry } = ctx;
   const greens = pantry.available.has("lettuce") ? "lettuce" : pantry.available.has("spinach") ? "spinach" : null;
-  const vegs = ["tomato","cucumber","bell pepper"].filter(v => pantry.available.has(v));
+  const vegs = ["tomato", "cucumber", "bell pepper"].filter(v => pantry.available.has(v));
   if (!greens && vegs.length < 2) return null;
   const used = [greens, ...vegs].filter(Boolean) as string[];
   const ingredients: Ingredient[] = [
@@ -357,8 +360,8 @@ export function soupTemplate(ctx: TemplateContext): RecipeSuggestion | null {
 export function wrapTemplate(ctx: TemplateContext): RecipeSuggestion | null {
   const { pantry } = ctx;
   const base = pantry.available.has("bread") ? "bread" : null;
-  const prot = ["paneer","tofu","chicken","egg"].find(p => pantry.available.has(p)) || null;
-  const vegs = ["lettuce","spinach","tomato","cucumber"].filter(v => pantry.available.has(v));
+  const prot = ["paneer", "tofu", "chicken", "egg"].find(p => pantry.available.has(p)) || null;
+  const vegs = ["lettuce", "spinach", "tomato", "cucumber"].filter(v => pantry.available.has(v));
   if (!base || (!prot && vegs.length === 0)) return null;
   const used = [base, prot, ...vegs].filter(Boolean) as string[];
   const ingredients: Ingredient[] = [
@@ -393,10 +396,10 @@ export function wrapTemplate(ctx: TemplateContext): RecipeSuggestion | null {
 // Template: Oven Traybake
 export function traybakeTemplate(ctx: TemplateContext): RecipeSuggestion | null {
   const { pantry } = ctx;
-  const roots = ["potato","carrot","beetroot"].filter(v => pantry.available.has(v));
-  const vegs = ["bell pepper","onion","broccoli","cauliflower"].filter(v => pantry.available.has(v));
+  const roots = ["potato", "carrot", "beetroot"].filter(v => pantry.available.has(v));
+  const vegs = ["bell pepper", "onion", "broccoli", "cauliflower"].filter(v => pantry.available.has(v));
   if (roots.length + vegs.length < 2) return null;
-  const used = [...roots, ...vegs].slice(0,4);
+  const used = [...roots, ...vegs].slice(0, 4);
   const ingredients: Ingredient[] = [
     ...used.map(v => ({ name: v, amount: "2 cups, chopped" })),
     { name: "oil", amount: "2 tbsp" },
@@ -419,6 +422,7 @@ export function traybakeTemplate(ctx: TemplateContext): RecipeSuggestion | null 
     instructions,
     score: scoreByUsage(pantry, used),
     cuisine: "European",
+    diet: "Vegetarian",
     matchedIngredientCount: used.length,
     totalIngredientCount: ingredients.length,
   };

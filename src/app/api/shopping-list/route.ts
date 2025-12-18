@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE /api/shopping-list - Remove item from shopping list
+// DELETE /api/shopping-list - Remove item(s) from shopping list
 export async function DELETE(request: Request) {
   try {
     const supabase = await createClient();
@@ -121,21 +121,33 @@ export async function DELETE(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const itemId = searchParams.get('id');
+    const id = searchParams.get('id');
+    const ids = searchParams.get('ids');
+    const all = searchParams.get('all');
 
-    if (!itemId) {
-      return NextResponse.json({ error: 'Item ID is required' }, { status: 400 });
-    }
-
-    const { error: deleteError } = await supabase
+    const query = supabase
       .from('shopping_list')
       .delete()
-      .eq('id', itemId)
-      .eq('user_id', user.id); // Ensure user owns the item
+      .eq('user_id', user.id);
 
-    if (deleteError) {
-      console.error('Error deleting shopping list item:', deleteError);
-      return NextResponse.json({ error: 'Failed to delete item' }, { status: 500 });
+    if (all === 'true') {
+      // Delete ALL items for this user
+      // No extra filter needed, just execute
+      const { error: deleteError } = await query;
+      if (deleteError) throw deleteError;
+    } else if (ids) {
+      // Delete multiple IDs
+      const idList = ids.split(',').filter(Boolean);
+      if (idList.length > 0) {
+        const { error: deleteError } = await query.in('id', idList);
+        if (deleteError) throw deleteError;
+      }
+    } else if (id) {
+      // Delete single ID (legacy support / single item click)
+      const { error: deleteError } = await query.eq('id', id);
+      if (deleteError) throw deleteError;
+    } else {
+      return NextResponse.json({ error: 'Missing id, ids, or all param' }, { status: 400 });
     }
 
     return NextResponse.json({ success: true });

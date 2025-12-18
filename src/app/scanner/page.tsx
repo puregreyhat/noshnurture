@@ -10,6 +10,7 @@ import { normalizeIngredientName } from '@/lib/ingredients/normalize';
 import { getSettings } from '@/lib/settings';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { Html5Qrcode } from 'html5-qrcode';
 import OCRScanner from '@/components/OCRScanner';
 import VoiceInput from '@/components/VoiceInput';
@@ -39,6 +40,8 @@ interface EnhancedScannedData {
 export default function ScannerPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
+
   // Helper: format a date string into local YYYY-MM-DD (fall back to original string if invalid)
   const formatLocalISO = (dateStr: string | undefined | null) => {
     if (!dateStr) return '';
@@ -47,25 +50,10 @@ export default function ScannerPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
   const [vkImporting, setVkImporting] = useState(false);
-  const [toasts, setToasts] = useState<Array<{ id: number; content: React.ReactNode }>>([]);
   const [showOCRScanner, setShowOCRScanner] = useState(false);
   const [showVoiceInput, setShowVoiceInput] = useState(false);
   const [showConversationalInput, setShowConversationalInput] = useState(false);
   const [showBillUpload, setShowBillUpload] = useState(false);
-
-  function addToast(content: React.ReactNode, timeout = 4000) {
-    const id = Date.now() + Math.floor(Math.random() * 1000);
-    setToasts((s) => [...s, { id, content }]);
-    if (timeout > 0) {
-      setTimeout(() => {
-        setToasts((s) => s.filter((t) => t.id !== id));
-      }, timeout);
-    }
-  }
-
-  function removeToast(id: number) {
-    setToasts((s) => s.filter((t) => t.id !== id));
-  }
   const [scanMode, setScanMode] = useState<'none' | 'camera' | 'upload' | 'manual' | 'form'>('none');
   const [scannedData, setScannedData] = useState<ScannedData | EnhancedScannedData | null>(null);
   const [dataSource, setDataSource] = useState<'qr' | 'ocr' | 'voice' | 'batch' | 'bill' | null>(null);
@@ -152,10 +140,27 @@ export default function ScannerPage() {
       const expiryDate = parseExpiryDate(data.expiryDate);
       const daysUntilExpiry = calculateDaysUntilExpiry(expiryDate);
 
+      // Parse quantity string (e.g. "500 g")
+      let quantity = 1;
+      let unit = 'item';
+
+      if (data.quantity) {
+        const match = data.quantity.match(/^([\d.]+)\s*([a-zA-Z]+)$/);
+        if (match) {
+          quantity = parseFloat(match[1]);
+          unit = match[2];
+        } else {
+          // Try to just get number
+          const num = parseFloat(data.quantity);
+          if (!isNaN(num)) quantity = num;
+          // Unit stays item or we could try to infer
+        }
+      }
+
       const newProduct: InventoryItem = {
         name: data.productName || 'Unknown Product',
-        quantity: 1,
-        unit: 'item',
+        quantity: quantity,
+        unit: unit,
         expiryDate: expiryDate,
         category: 'groceries',
         storageType: 'refrigerator',
@@ -173,16 +178,14 @@ export default function ScannerPage() {
       setScannedData(enhancedData);
       setDataSource('ocr');
       setShowOCRScanner(false);
-      addToast(
+      toast.success(
         <div className="flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600" />
           <span>Product added: {data.productName}</span>
         </div>
       );
     } catch (err) {
-      addToast(
+      toast.error(
         <div className="flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-red-600" />
           <span>Error adding product</span>
         </div>
       );
@@ -217,16 +220,14 @@ export default function ScannerPage() {
       setScannedData(enhancedData);
       setDataSource('voice');
       setShowVoiceInput(false);
-      addToast(
+      toast.success(
         <div className="flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600" />
           <span>Product added: {data.productName}</span>
         </div>
       );
     } catch (err) {
-      addToast(
+      toast.error(
         <div className="flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-red-600" />
           <span>Error adding product</span>
         </div>
       );
@@ -270,16 +271,14 @@ export default function ScannerPage() {
       setScannedData(enhancedData);
       setDataSource('batch');
       setShowConversationalInput(false);
-      addToast(
+      toast.success(
         <div className="flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600" />
           <span>✓ Added {products.length} products successfully!</span>
         </div>
       );
     } catch (err) {
-      addToast(
+      toast.error(
         <div className="flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-red-600" />
           <span>Error adding products from conversation</span>
         </div>
       );
@@ -325,16 +324,14 @@ export default function ScannerPage() {
       setScannedData(enhancedData);
       setDataSource('bill');
       setShowBillUpload(false);
-      addToast(
+      toast.success(
         <div className="flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600" />
           <span>✓ Added {products.length} products from bill!</span>
         </div>
       );
     } catch (err) {
-      addToast(
+      toast.error(
         <div className="flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-red-600" />
           <span>Error adding products from bill</span>
         </div>
       );
@@ -628,35 +625,37 @@ export default function ScannerPage() {
       const supabase = createClient();
       const { error } = await supabase.from('inventory_items').insert(dbRows);
       if (error) {
-        alert('❌ Failed to save items: ' + error.message);
+        toast.error('❌ Failed to save items: ' + error.message);
         return;
       }
       const savedCount = dbRows.length;
       const skippedCount = itemsToSave.length - savedCount;
-      alert(`✅ Successfully added ${savedCount} items to your inventory${skippedCount > 0 ? ` (skipped ${skippedCount} basic items)` : ''}!`);
-      window.location.href = '/';
+      toast.success(`✅ Successfully added ${savedCount} items to your inventory${skippedCount > 0 ? ` (skipped ${skippedCount} basic items)` : ''}!`);
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 1500);
     } catch (err) {
       const error = err as Error;
-      alert('❌ Error saving to inventory: ' + (error?.message || String(err)));
+      toast.error('❌ Error saving to inventory: ' + (error?.message || String(err)));
     }
   };
 
   // Import Vkart orders into NoshNurture via server API
   const handleImportVkart = async () => {
     if (!user) {
-      addToast('Please sign in to import your Vkart orders.', 4000);
+      toast.error('Please sign in to import your Vkart orders.');
       return;
     }
 
     setVkImporting(true);
-    addToast('Import started — fetching your Vkart orders...', 2500);
+    toast.info('Import started — fetching your Vkart orders...');
     try {
       const res = await fetch('/api/vkart-sync', { method: 'POST' });
       const json = await res.json();
 
       if (!res.ok) {
         const msg = json?.error || res.statusText || 'Unknown error';
-        addToast(<>Import failed: <span className="font-semibold">{String(msg)}</span></>, 6000);
+        toast.error(<>Import failed: <span className="font-semibold">{String(msg)}</span></>);
       } else {
         const imported = json.imported ?? 0;
         const updated = json.updated ?? 0;
@@ -680,11 +679,11 @@ export default function ScannerPage() {
           </div>
         );
 
-        addToast(content, 8000);
+        toast.success(content);
       }
     } catch (e) {
       const err = e as Error;
-      addToast('Import failed: ' + (err?.message || String(e)), 6000);
+      toast.error('Import failed: ' + (err?.message || String(e)));
     } finally {
       setVkImporting(false);
     }
@@ -1287,18 +1286,6 @@ export default function ScannerPage() {
           )}
         </div>
       </motion.div>
-
-      {/* Toast container */}
-      <div className="fixed top-6 right-6 flex flex-col gap-3 z-50">
-        {toasts.map((t) => (
-          <div key={t.id} className="bg-white/95 border border-gray-200 rounded-lg shadow-lg p-3 max-w-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 text-sm text-gray-800">{t.content}</div>
-              <button onClick={() => removeToast(t.id)} className="ml-2 text-gray-500 hover:text-gray-700">✕</button>
-            </div>
-          </div>
-        ))}
-      </div>
 
       {/* OCR Scanner Modal */}
       {showOCRScanner && (

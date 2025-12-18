@@ -59,6 +59,7 @@ export default function ProductInventory() {
       addedDate: new Date().toISOString().split('T')[0],
       batchNumber: data.batchNumber,
       confidence: data.confidence,
+      quantity: data.quantity,
       daysUntilExpiry,
     };
     setProducts([...products, newProduct]);
@@ -205,15 +206,14 @@ export default function ProductInventory() {
               return (
                 <div
                   key={product.id}
-                  className={`${status.bgColor} border-l-4 ${
-                    status.color === 'red'
+                  className={`${status.bgColor} border-l-4 ${status.color === 'red'
                       ? 'border-red-600'
                       : status.color === 'orange'
                         ? 'border-orange-600'
                         : status.color === 'yellow'
                           ? 'border-yellow-600'
                           : 'border-green-600'
-                  } rounded-lg p-4 shadow-md`}
+                    } rounded-lg p-4 shadow-md`}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">

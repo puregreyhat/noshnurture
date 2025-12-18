@@ -40,10 +40,10 @@ export async function generateSuggestions(items: InventoryItemDB[]): Promise<Rec
   candidates.sort((a, b) => {
     const matchedCountDiff = (b.matchedIngredientCount || 0) - (a.matchedIngredientCount || 0);
     if (matchedCountDiff !== 0) return matchedCountDiff;
-    
+
     const scoreDiff = b.score - a.score;
     if (scoreDiff !== 0) return scoreDiff;
-    
+
     return a.totalTime - b.totalTime;
   });
   return candidates.slice(0, 5);

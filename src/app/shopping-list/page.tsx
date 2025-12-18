@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   ShoppingCart,
   Plus,
@@ -11,9 +14,11 @@ import {
   ChefHat,
   TrendingDown,
   X,
-  Check
+  Check,
+  Download
 } from 'lucide-react';
 import Loading from '@/components/Loading';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 interface ShoppingListItem {
   id: string;
@@ -35,12 +40,27 @@ interface LowStockItem {
 export default function ShoppingListPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [items, setItems] = useState<ShoppingListItem[]>([]);
   const [lowStockItems, setLowStockItems] = useState<LowStockItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showLowStockModal, setShowLowStockModal] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [longPressTimer, setLongPressTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Confirm Dialog State
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    action: () => { },
+    isDangerous: false,
+  });
 
   // Form state
   const [newItemName, setNewItemName] = useState('');
@@ -65,6 +85,7 @@ export default function ShoppingListPage() {
       }
     } catch (error) {
       console.error('Error fetching shopping list:', error);
+      toast.error('Failed to load shopping list');
     } finally {
       setLoading(false);
     }
@@ -90,6 +111,83 @@ export default function ShoppingListPage() {
     }
   }, [user]);
 
+  // --- Bulk Actions ---
+
+  const handleClearAll = async () => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Clear Shopping List?',
+      message: 'This will remove all items from your shopping list. This action cannot be undone.',
+      isDangerous: true,
+      action: async () => {
+        try {
+          const res = await fetch('/api/shopping-list?all=true', { method: 'DELETE' });
+          if (res.ok) {
+            setItems([]);
+            setIsSelectionMode(false);
+            setSelectedIds(new Set());
+            toast.success('Shopping list cleared');
+          } else {
+            toast.error('Failed to clear list');
+          }
+        } catch (err) {
+          console.error('Failed to clear list', err);
+          toast.error('Error clearing list');
+        } finally {
+          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+        }
+      }
+    });
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    try {
+      const ids = Array.from(selectedIds).join(',');
+      const res = await fetch(`/api/shopping-list?ids=${ids}`, { method: 'DELETE' });
+      if (res.ok) {
+        setItems(items.filter(i => !selectedIds.has(i.id)));
+        setIsSelectionMode(false);
+        setSelectedIds(new Set());
+        toast.success('Selected items deleted');
+      } else {
+        toast.error('Failed to delete selected items');
+      }
+    } catch (err) {
+      console.error('Failed to delete selected', err);
+      toast.error('Error deleting items');
+    }
+  };
+
+  const toggleSelection = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+      if (next.size === 0) setIsSelectionMode(false);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
+
+  // --- Long Press Logic ---
+  const handleTouchStart = (id: string) => {
+    const timer = setTimeout(() => {
+      setIsSelectionMode(true);
+      const next = new Set(selectedIds);
+      next.add(id);
+      setSelectedIds(next);
+    }, 500); // 500ms long press
+    setLongPressTimer(timer);
+  };
+
+  const handleTouchEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
   // Add item to shopping list
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,15 +212,17 @@ export default function ShoppingListPage() {
         setNewItemQuantity('1');
         setNewItemUnit('pcs');
         setShowAddModal(false);
+        toast.success('Item added');
       }
     } catch (error) {
       console.error('Error adding item:', error);
+      toast.error('Failed to add item');
     } finally {
       setAddingItem(false);
     }
   };
 
-  // Delete item
+  // Delete item (single)
   const handleDeleteItem = async (itemId: string) => {
     try {
       const response = await fetch(`/api/shopping-list?id=${itemId}`, {
@@ -131,9 +231,11 @@ export default function ShoppingListPage() {
 
       if (response.ok) {
         setItems(items.filter(item => item.id !== itemId));
+        toast.success('Item removed');
       }
     } catch (error) {
       console.error('Error deleting item:', error);
+      toast.error('Failed to delete item');
     }
   };
 
@@ -154,15 +256,63 @@ export default function ShoppingListPage() {
       if (response.ok) {
         await fetchShoppingList();
         setLowStockItems(lowStockItems.filter(ls => ls.id !== item.id));
+        toast.success('Added low stock item');
       }
     } catch (error) {
       console.error('Error adding low-stock item:', error);
+      toast.error('Failed to add item');
+    }
+  };
+
+  // Export PDF
+  const handleExportPDF = () => {
+    if (items.length === 0) return;
+    setExporting(true);
+
+    try {
+      const doc = new jsPDF();
+
+      // Title
+      doc.setFontSize(20);
+      doc.setTextColor(40, 40, 40);
+      doc.text('Shopping List', 14, 22);
+
+      // Date
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on ${new Date().toLocaleDateString()}`, 14, 30);
+
+      // Table
+      const tableData = items.map(item => [
+        item.item_name,
+        `${item.quantity} ${item.unit}`,
+        item.added_from.replace('_', ' ') // prettier label
+      ]);
+
+      autoTable(doc, {
+        head: [['Item', 'Qty', 'Source']],
+        body: tableData,
+        startY: 35,
+        theme: 'grid',
+        headStyles: { fillColor: [16, 185, 129] }, // emerald-500
+        styles: { fontSize: 10, cellPadding: 3 },
+      });
+
+      doc.save('noshnurture-shopping-list.pdf');
+      toast.success('PDF exported!');
+    } catch (err) {
+      console.error('Export failed', err);
+      toast.error('Failed to export PDF');
+    } finally {
+      setExporting(false);
     }
   };
 
   if (authLoading || loading) {
     return <Loading />;
   }
+
+  // --- Rendering Helpers ---
 
   const getSourceIcon = (source: string) => {
     switch (source) {
@@ -182,6 +332,14 @@ export default function ShoppingListPage() {
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] font-['Poppins'] pb-24 pt-6 px-4">
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.action}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, isOpen: false }))}
+        isDangerous={confirmDialog.isDangerous}
+      />
 
       {/* Header */}
       <div className="max-w-4xl mx-auto mb-8">
@@ -203,22 +361,53 @@ export default function ShoppingListPage() {
 
         {/* Action Buttons */}
         <div className="flex gap-3 mt-6 justify-center flex-wrap">
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-medium hover:bg-emerald-700 transition flex items-center gap-2 shadow-lg shadow-emerald-100"
-          >
-            <Plus className="w-5 h-5" />
-            Add Item
-          </button>
-
-          {lowStockItems.length > 0 && (
+          {isSelectionMode ? (
             <button
-              onClick={() => setShowLowStockModal(true)}
-              className="px-6 py-3 bg-amber-500 text-white rounded-2xl font-medium hover:bg-amber-600 transition flex items-center gap-2 shadow-lg shadow-amber-100"
+              onClick={handleBulkDelete}
+              className="px-6 py-3 bg-red-500 text-white rounded-2xl font-medium hover:bg-red-600 transition flex items-center gap-2 shadow-lg shadow-red-100 animate-in fade-in zoom-in"
             >
-              <TrendingDown className="w-5 h-5" />
-              Low Stock ({lowStockItems.length})
+              <Trash2 className="w-5 h-5" />
+              Delete Selected ({selectedIds.size})
             </button>
+          ) : (
+            <>
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="px-6 py-3 bg-emerald-600 text-white rounded-2xl font-medium hover:bg-emerald-700 transition flex items-center gap-2 shadow-lg shadow-emerald-100"
+              >
+                <Plus className="w-5 h-5" />
+                Add Item
+              </button>
+
+              <button
+                onClick={handleExportPDF}
+                disabled={exporting || items.length === 0}
+                className="px-6 py-3 bg-white text-stone-600 border border-stone-200 rounded-2xl font-medium hover:bg-stone-50 hover:border-stone-300 transition flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Download className="w-5 h-5" />
+                {exporting ? 'Exporting...' : 'Export'}
+              </button>
+
+              {items.length > 0 && (
+                <button
+                  onClick={handleClearAll}
+                  className="px-6 py-3 bg-white text-red-500 border border-red-100 rounded-2xl font-medium hover:bg-red-50 hover:border-red-200 transition flex items-center gap-2 shadow-sm"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Clear All
+                </button>
+              )}
+
+              {lowStockItems.length > 0 && (
+                <button
+                  onClick={() => setShowLowStockModal(true)}
+                  className="px-6 py-3 bg-amber-500 text-white rounded-2xl font-medium hover:bg-amber-600 transition flex items-center gap-2 shadow-lg shadow-amber-100"
+                >
+                  <TrendingDown className="w-5 h-5" />
+                  Low Stock ({lowStockItems.length})
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -238,42 +427,77 @@ export default function ShoppingListPage() {
             <p className="text-stone-400">Add items manually or from recipes</p>
           </motion.div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-4 select-none">
+            {isSelectionMode && (
+              <div className="text-center text-sm text-stone-500 mb-2 animate-in fade-in">
+                Tap items to select • Tap & hold to select more
+              </div>
+            )}
             <AnimatePresence>
-              {items.map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 hover:shadow-md transition flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className={`p-3 rounded-xl ${getSourceColor(item.added_from)}`}>
-                      {getSourceIcon(item.added_from)}
-                    </div>
-
-                    <div className="flex-1">
-                      <h3 className="font-serif font-semibold text-stone-800 text-lg">{item.item_name}</h3>
-                      <p className="text-sm text-stone-500">
-                        Quantity: {item.quantity} {item.unit}
-                      </p>
-                      <p className="text-xs text-stone-400 mt-1">
-                        Added from: {item.added_from.replace('_', ' ')}
-                      </p>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleDeleteItem(item.id)}
-                    className="p-3 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition"
-                    title="Mark as purchased / Remove"
+              {items.map((item, index) => {
+                const isSelected = selectedIds.has(item.id);
+                return (
+                  <motion.div
+                    key={item.id}
+                    layout
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{
+                      opacity: 1,
+                      x: 0,
+                      scale: isSelected ? 0.98 : 1,
+                      backgroundColor: isSelected ? '#F0FDF4' : '#FFFFFF',
+                      borderColor: isSelected ? '#10B981' : '#F3F4F6'
+                    }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ delay: index * 0.05 }}
+                    onMouseDown={() => handleTouchStart(item.id)}
+                    onMouseUp={handleTouchEnd}
+                    onTouchStart={() => handleTouchStart(item.id)}
+                    onTouchEnd={handleTouchEnd}
+                    onClick={() => {
+                      if (isSelectionMode) toggleSelection(item.id);
+                    }}
+                    className={`rounded-2xl p-5 shadow-sm border transition flex items-center justify-between cursor-pointer relative overflow-hidden ${isSelected ? 'ring-2 ring-emerald-500 ring-offset-2' : 'hover:shadow-md'
+                      }`}
                   >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </motion.div>
-              ))}
+                    <div className="flex items-center gap-4 flex-1 pointer-events-none">
+                      {isSelectionMode && (
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-emerald-500 border-emerald-500' : 'border-stone-300'
+                          }`}>
+                          {isSelected && <Check className="w-4 h-4 text-white" />}
+                        </div>
+                      )}
+
+                      <div className={`p-3 rounded-xl ${getSourceColor(item.added_from)}`}>
+                        {getSourceIcon(item.added_from)}
+                      </div>
+
+                      <div className="flex-1">
+                        <h3 className="font-serif font-semibold text-stone-800 text-lg">{item.item_name}</h3>
+                        <p className="text-sm text-stone-500">
+                          Quantity: {item.quantity} {item.unit}
+                        </p>
+                        <p className="text-xs text-stone-400 mt-1">
+                          Added from: {item.added_from.replace('_', ' ')}
+                        </p>
+                      </div>
+                    </div>
+
+                    {!isSelectionMode && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteItem(item.id);
+                        }}
+                        className="p-3 text-stone-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition z-10"
+                        title="Remove"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    )}
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </div>
         )}

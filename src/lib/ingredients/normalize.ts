@@ -41,19 +41,19 @@ function tokensToCandidate(tokens: string[]): string | null {
   // try full join first
   const joined = tokens.join(" ");
   if (CANONICAL_INGREDIENTS.includes(joined)) return joined;
-  
+
   // Words to skip: descriptors (prep methods, quantities) and brand names
   const descriptorsAndBrands = new Set([
-    'small','medium','large','optional','fresh','ripe','chopped','diced','sliced','thinly','grated','ground','minced','crushed','to','taste','soft','dinner','pieces','piece',
+    'small', 'medium', 'large', 'optional', 'fresh', 'ripe', 'chopped', 'diced', 'sliced', 'thinly', 'grated', 'ground', 'minced', 'crushed', 'to', 'taste', 'soft', 'dinner', 'pieces', 'piece',
     // Common Indian food brand names
-    'everest','suhana','shan','tamarind','tata','amul','aashirvaad','registry','badshah','MDH','shan','catch','eastern','spice','dabur','britannia','britannia',
+    'everest', 'suhana', 'shan', 'tamarind', 'tata', 'amul', 'aashirvaad', 'registry', 'badshah', 'MDH', 'shan', 'catch', 'eastern', 'spice', 'dabur', 'britannia', 'britannia',
     // Other common brand/filler words
-    'organic','natural','premium','pure','extract','essence','powder','oil'
+    'organic', 'natural', 'premium', 'pure', 'extract', 'essence', 'powder', 'oil'
   ]);
 
   // Filter out descriptors and brand names, keeping only meaningful ingredient tokens
   const meaningfulTokens = tokens.filter(t => !descriptorsAndBrands.has(t));
-  
+
   // If all tokens were descriptors/brands, use originals
   const toCheck = meaningfulTokens.length > 0 ? meaningfulTokens : tokens;
 
@@ -66,14 +66,14 @@ function tokensToCandidate(tokens: string[]): string | null {
     if (descriptorsAndBrands.has(t)) continue;
     if (CANONICAL_INGREDIENTS.includes(t)) return t;
   }
-  
+
   // Next, try synonyms mapping (so words like 'chilli' -> 'chili')
   for (const t of toCheck) {
     if (descriptorsAndBrands.has(t)) continue;
     // Use the imported SYNONYMS mapping (avoid runtime require/circular import)
     if (SYNONYMS && SYNONYMS[t]) return SYNONYMS[t];
   }
-  
+
   // Try all two-word combinations of meaningful tokens (for compound ingredients like "pav bhaji")
   if (toCheck.length >= 2) {
     for (let i = 0; i < toCheck.length - 1; i++) {
@@ -84,7 +84,7 @@ function tokensToCandidate(tokens: string[]): string | null {
 
   // Fallback: return the longest non-descriptor token (likely the most specific)
   if (toCheck.length > 0) return toCheck.reduce((a, b) => (a.length >= b.length ? a : b));
-  
+
   // ultimate fallback
   return tokens[0] || tokens[tokens.length - 1];
 }
@@ -126,15 +126,8 @@ export async function normalizeIngredientName(raw: string, opts?: NormalizeOptio
   if (fuzzy) return fuzzy.item;
 
   // optional semantic
-  if (opts?.prefer === "semantic") {
-    try {
-      const { findClosestByEmbedding } = await import("./semantic");
-  const semantic = await findClosestByEmbedding(text, Array.from(CANONICAL_INGREDIENTS));
-      if (semantic) return semantic;
-    } catch {
-      // ignore semantic failure
-    }
-  }
+  // semantic search removed
+
 
   // fallback: return cleaned candidate
   return candidate;
@@ -163,15 +156,8 @@ export async function normalizeIngredientNameWithScore(raw: string, opts?: Norma
   const fuzzy = findClosestByFuzzy(candidate, 1);
   if (fuzzy) return { canonical: fuzzy.item, distance: fuzzy.score, method: 'fuzzy' };
 
-  if (opts?.prefer === 'semantic') {
-    try {
-      const { findClosestByEmbedding } = await import('./semantic');
-      const semantic = await findClosestByEmbedding(text, Array.from(CANONICAL_INGREDIENTS));
-      if (semantic) return { canonical: semantic, distance: null, method: 'semantic' };
-    } catch {
-      // ignore semantic failure
-    }
-  }
+  // semantic search removed
+
 
   return { canonical: candidate, distance: null, method: 'fallback' };
 }

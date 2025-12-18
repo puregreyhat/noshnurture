@@ -247,6 +247,14 @@ export async function GET(request: Request) {
                 return { name: '', amount: '' };
               }).filter(ing => ing.name),
               cuisine,
+              diet: (() => {
+                const d = String((recipe.diet ?? '') as unknown).trim();
+                if (d) return d;
+                const tags = Array.isArray(recipe.tags) ? (recipe.tags as string[]) : [];
+                if (tags.some(t => String(t).toLowerCase() === 'vegetarian')) return 'Vegetarian';
+                if (tags.some(t => String(t).toLowerCase() === 'non-veg')) return 'Non-Vegetarian';
+                return '';
+              })(),
               matchedIngredientCount: matchedCount,
               totalIngredientCount: totalCount,
             };

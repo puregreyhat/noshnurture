@@ -64,7 +64,7 @@ export async function extractExpiryFromImage(
     const apiKey = getGeminiApiKey();
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -117,7 +117,19 @@ If you cannot read the date clearly, set confidence to a lower value (0.3-0.7).`
     );
 
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
+      const errorText = await response.text();
+      let errorMessage = `Gemini API error: ${response.status} ${response.statusText}`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error && errorJson.error.message) {
+          errorMessage += ` - ${errorJson.error.message}`;
+        } else {
+          errorMessage += ` - ${errorText}`;
+        }
+      } catch (e) {
+        errorMessage += ` - ${errorText}`;
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -157,7 +169,7 @@ If you cannot read the date clearly, set confidence to a lower value (0.3-0.7).`
     if (expiryDate && mfgDate) {
       const expDate = parseDate(expiryDate);
       const mfDate = parseDate(mfgDate);
-      
+
       if (expDate && mfDate) {
         // If mfg date is larger, it might actually be the expiry date
         // Expiry should always be after manufacturing
@@ -194,7 +206,7 @@ export async function processVoiceInput(
     const apiKey = getGeminiApiKey();
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -287,7 +299,7 @@ export async function getRecipeSuggestions(
     const apiKey = getGeminiApiKey();
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -360,7 +372,7 @@ export async function extractProductDetailsFromSpeech(
     const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -461,7 +473,7 @@ export async function extractProductsFromBill(
     const apiKey = getGeminiApiKey();
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {
@@ -582,7 +594,7 @@ export async function parseNaturalLanguageDate(dateInput: string): Promise<strin
     const todayStr = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: {

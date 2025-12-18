@@ -4,6 +4,7 @@ import "./globals.css";
 import FloatingNavbar from "@/components/layout/FloatingNavbar";
 import GoogleTranslate from "@/components/GoogleTranslate";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ToastProvider } from "@/contexts/ToastContext";
 import ConditionalHeyNosh from "@/components/ConditionalHeyNosh";
 
 const geistSans = Geist({
@@ -46,12 +47,14 @@ export default function RootLayout({
           <div className="absolute inset-0 [background-image:linear-gradient(to_right,rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:24px_24px]" />
         </div>
         <AuthProvider>
-          <GoogleTranslate />
-          {children}
-          {/* Floating navbar visible on all screens */}
-          <FloatingNavbar />
-          {/* Hey Nosh Voice Assistant - hidden on survey page */}
-          <ConditionalHeyNosh />
+          <ToastProvider>
+            <GoogleTranslate />
+            {children}
+            {/* Floating navbar visible on all screens */}
+            <FloatingNavbar />
+            {/* Hey Nosh Voice Assistant - hidden on survey page */}
+            <ConditionalHeyNosh />
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

@@ -15,7 +15,6 @@ import WelcomeSection from "./Welcome";
 import { ExpiryAlert } from "@/components/ExpiryAlert";
 import { createClient } from "@/lib/supabase/client";
 import { getSettings } from "@/lib/settings";
-import { isLocalModelAvailable, generateLocalRecipe } from "@/lib/recipes/localRnn";
 import type { InventoryItemDB } from "@/lib/supabase-types";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -33,10 +32,11 @@ export default function FoodDashboard() {
     readyInMinutes?: number;
     servings?: number;
     cuisine?: string;
+    items?: unknown[];
     ingredients?: { name: string; amount?: string }[];
+    diet?: string; // Added diet field
   }>>([]);
 
-  const [localAIReady, setLocalAIReady] = useState<boolean>(false);
   const [enhanced, setEnhanced] = useState<Array<{
     title: string;
     image?: string;
@@ -57,6 +57,7 @@ export default function FoodDashboard() {
   const [recipePageIndex, setRecipePageIndex] = useState<number>(0);
   const [previousButtonClicks, setPreviousButtonClicks] = useState<number>(0);
   const [showAllRecipes, setShowAllRecipes] = useState<boolean>(false);
+  const [showVegOnly, setShowVegOnly] = useState<boolean>(false); // New state for veg-only filter
 
   const [previousUser, setPreviousUser] = useState(user);
 
@@ -79,7 +80,7 @@ export default function FoodDashboard() {
 
   // Auto-enable all recipes for admin user
   useEffect(() => {
-    if (user?.email === 'puregreyhat@gmail.com') {
+    if (user?.email === 'puregreyhat@gmail.com' || user?.email === 'akash73195@gmail.com') {
       setShowAllRecipes(true);
     }
   }, [user]);
@@ -529,8 +530,7 @@ export default function FoodDashboard() {
                 )}
               </div>
 
-              {/* Search Bar */}
-              <div className="flex-1 w-full">
+              <div className="flex-1 w-full flex items-center gap-4">
                 <input
                   type="text"
                   placeholder="Search recipes or ingredients..."
@@ -539,8 +539,41 @@ export default function FoodDashboard() {
                     setRecipeSearchQuery(e.target.value);
                     setRecipePageIndex(0);
                   }}
-                  className="w-full px-5 py-3 border border-stone-200 rounded-xl bg-white text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  className="flex-1 px-5 py-3 border border-stone-200 rounded-xl bg-white text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
                 />
+
+                {/* Skeuomorphic Tactile Toggle (Pill Shape, No Text) */}
+                <div
+                  onClick={() => {
+                    setShowVegOnly(!showVegOnly);
+                    setRecipePageIndex(0);
+                  }}
+                  className={`cursor-pointer relative w-24 h-12 rounded-full transition-all duration-300 ${showVegOnly
+                      ? 'bg-emerald-100 shadow-[inset_2px_2px_5px_rgba(16,185,129,0.3),inset_-2px_-2px_5px_rgba(255,255,255,1)] border-emerald-200'
+                      : 'bg-[#EFEDE6] shadow-[inset_2px_2px_5px_rgba(168,166,158,0.4),inset_-2px_-2px_5px_rgba(255,255,255,1)] border-[#E5E2D9]'
+                    } border p-1`}
+                  title={showVegOnly ? "Show All Recipes" : "Show Veg Only"}
+                >
+                  <motion.div
+                    className={`w-10 h-10 rounded-full shadow-[3px_3px_6px_rgba(168,166,158,0.4),-1px_-1px_3px_rgba(255,255,255,0.8)] flex items-center justify-center border border-white transition-colors duration-300 ${showVegOnly ? 'bg-emerald-50' : 'bg-[#F5F2EA]'
+                      }`}
+                    animate={{
+                      x: showVegOnly ? 48 : 0,
+                    }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                  >
+                    <motion.span
+                      animate={{
+                        color: showVegOnly ? '#10b981' : '#A8A29E',
+                        scale: showVegOnly ? 1.15 : 1,
+                        filter: showVegOnly ? 'drop-shadow(0 0 2px rgba(16,185,129,0.5))' : 'none'
+                      }}
+                      className="text-xl"
+                    >
+                      🌿
+                    </motion.span>
+                  </motion.div>
+                </div>
               </div>
             </div>
 
@@ -579,6 +612,12 @@ export default function FoodDashboard() {
                   if (selectedCuisines.size === 0) return true;
                   const sCuisine = (s as unknown as Record<string, unknown>).cuisine as string | undefined;
                   return sCuisine && selectedCuisines.has(sCuisine);
+                })
+                .filter((s) => {
+                  if (!showVegOnly) return true;
+                  // Check diet field
+                  const diet = s.diet || (s as any).diet;
+                  return diet === 'Vegetarian';
                 })
                 .filter((s) => {
                   if (!recipeSearchQuery.trim()) return true;
