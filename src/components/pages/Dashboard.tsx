@@ -17,6 +17,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getSettings } from "@/lib/settings";
 import type { InventoryItemDB } from "@/lib/supabase-types";
 import { useAuth } from "@/contexts/AuthContext";
+import { calculateDaysUntilExpiry, getStatusFromDays } from "@/lib/utils/dateUtils";
 
 export default function FoodDashboard() {
   const { user } = useAuth();
@@ -179,6 +180,9 @@ export default function FoodDashboard() {
             const today = new Date().toDateString();
 
             if (lastSent !== today) {
+              // Set immediately to prevent race conditions/double sends
+              sessionStorage.setItem(lastSentKey, today);
+
               fetch('/api/telegram/send-recipes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -191,11 +195,12 @@ export default function FoodDashboard() {
                 .then((result) => {
                   if (result.success) {
                     console.log('[Dashboard] Recipe notification sent via Telegram');
-                    sessionStorage.setItem(lastSentKey, today);
                   }
                 })
                 .catch((err) => {
                   console.log('[Dashboard] Telegram recipe notification skipped:', err.message);
+                  // Optional: revert if failed, but maybe better to just skip for today to avoid spam loop
+                  // sessionStorage.removeItem(lastSentKey);
                 });
             }
           }
@@ -269,14 +274,30 @@ export default function FoodDashboard() {
   // mealPlan placeholder removed — using dynamic suggestions/estimates instead
 
   // lightweight derived values used by the UI
-  const expiringItemsGrouped = inventoryItems.map((it) => ({
-    name: (it.product_name || 'Item') as string,
-    quantity: (it.quantity ?? 0) as number,
-    unit: (it.unit ?? '') as string,
-    expiry: typeof it.days_until_expiry === 'number' ? `${String(it.days_until_expiry)} days` : 'Unknown',
-    action: typeof it.days_until_expiry === 'number' && it.days_until_expiry <= 3 ? 'Use soon' : 'Plan',
-    tags: it.tags || [],
-  }));
+  const expiringItemsGrouped = inventoryItems.map((it) => {
+    // Determine dynamic days until expiry and action
+    const days = calculateDaysUntilExpiry(it.expiry_date);
+    const status = getStatusFromDays(days);
+
+    let action = 'Plan';
+    if (status === 'expired') action = 'Expired';
+    else if (status === 'warning' || status === 'caution') action = 'Use soon';
+
+    return {
+      name: (it.product_name || 'Item') as string,
+      quantity: (it.quantity ?? 0) as number,
+      unit: (it.unit ?? '') as string,
+      expiry: days < 0
+        ? `Expired ${Math.abs(days)} days ago`
+        : days === 0
+          ? 'Expires today'
+          : `${days} days left`,
+      action: action,
+      tags: it.tags || [],
+      days_until_expiry: days, // keep for filtering logic if needed
+      status: status
+    };
+  });
 
   const summary = {
     foodTracked: inventoryItems.length,

@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ExpiryAlert } from "@/components/ExpiryAlert";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import EditInventoryDialog from "@/components/EditInventoryDialog";
+import { calculateDaysUntilExpiry, getStatusFromDays } from "@/lib/utils/dateUtils";
 
 export default function InventoryPage() {
   const { user } = useAuth();
@@ -57,31 +58,8 @@ export default function InventoryPage() {
     }
   };
 
-  const calculateDaysUntilExpiry = (expiryDate: string): number => {
-    if (!expiryDate) return 0;
-    try {
-      // Handle both DD/MM/YYYY and DD-MM-YYYY formats
-      const separator = expiryDate.includes('/') ? '/' : '-';
-      const [day, month, year] = expiryDate.split(separator).map(Number);
+  // Helper functions moved to @/lib/utils/dateUtils
 
-      const exp = new Date(year, month - 1, day);
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      exp.setHours(0, 0, 0, 0);
-
-      return Math.floor((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    } catch (e) {
-      console.error('Error parsing expiry date:', expiryDate, e);
-      return 0;
-    }
-  };
-
-  const getStatusFromDays = (days: number): 'fresh' | 'caution' | 'warning' | 'expired' => {
-    if (days < 0) return 'expired';
-    if (days <= 3) return 'warning';
-    if (days <= 7) return 'caution';
-    return 'fresh';
-  };
 
   // Group items by product name and sum quantities
   const groupedInventory = inventoryItems.reduce((acc, item) => {

@@ -1,5 +1,6 @@
 import { InventoryItemDB } from '@/lib/supabase-types';
 import { normalizeIngredientName } from './normalize';
+import { calculateDaysUntilExpiry } from '@/lib/utils/dateUtils';
 
 export type CanonicalExpiry = { canonical: string; days_until_expiry: number };
 
@@ -17,22 +18,10 @@ export async function normalizeInventoryItems(items: InventoryItemDB[]): Promise
 
   for (const item of items) {
     // Calculate dynamic days_until_expiry
-    let daysUntilExpiry = 0;
-    if (item.expiry_date) {
-      try {
-        const separator = item.expiry_date.includes('/') ? '/' : '-';
-        const [day, month, year] = item.expiry_date.split(separator).map(Number);
-        const exp = new Date(year, month - 1, day);
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        exp.setHours(0, 0, 0, 0);
-        daysUntilExpiry = Math.floor((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      } catch {
-        daysUntilExpiry = Number(item.days_until_expiry || 0);
-      }
-    } else {
-      daysUntilExpiry = Number(item.days_until_expiry || 0);
-    }
+    // Calculate dynamic days_until_expiry
+    const daysUntilExpiry = item.expiry_date
+      ? calculateDaysUntilExpiry(item.expiry_date)
+      : Number(item.days_until_expiry || 0);
 
     // Skip expired items
     if (daysUntilExpiry < 0) continue;

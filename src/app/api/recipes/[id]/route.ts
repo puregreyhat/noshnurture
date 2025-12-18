@@ -91,121 +91,191 @@ export async function GET(
     // RecipeDetail shape.
     const localMatch = normalizedId.match(/^local-(\d+)$/) || normalizedId.match(/^recipes-site:(\d+)$/);
     const sugranMatch = normalizedId.match(/^sugran-(.+)$/);
-      if (localMatch || sugranMatch) {
-        try {
-          let resp;
-          if (sugranMatch) {
-            const sugranId = sugranMatch[1];
-            const SUGRAN = process.env.SUGRAN_URL || process.env.RECIPES_SITE_URL || 'https://sugran.vercel.app';
-            resp = await fetch(`${SUGRAN.replace(/\/$/, '')}/api/recipes/${encodeURIComponent(sugranId)}`);
-          } else {
-            const localId = localMatch![1];
-            const RECIPES_SITE = process.env.RECIPES_SITE_URL || 'http://localhost:3005';
-            resp = await fetch(`${RECIPES_SITE.replace(/\/$/, '')}/api/recipes/${encodeURIComponent(localId)}`);
-          }
-          if (!resp.ok) {
-            return NextResponse.json({ error: 'Local recipe not found' }, { status: resp.status });
-          }
-          const j = await resp.json();
-          const r = (j && j.recipe) || j;
+    if (localMatch || sugranMatch) {
+      try {
+        let resp;
+        if (sugranMatch) {
+          const sugranId = sugranMatch[1];
+          const SUGRAN = process.env.SUGRAN_URL || process.env.RECIPES_SITE_URL || 'https://sugran.vercel.app';
+          resp = await fetch(`${SUGRAN.replace(/\/$/, '')}/api/recipes/${encodeURIComponent(sugranId)}`);
+        } else {
+          const localId = localMatch![1];
+          const RECIPES_SITE = process.env.RECIPES_SITE_URL || 'http://localhost:3005';
+          resp = await fetch(`${RECIPES_SITE.replace(/\/$/, '')}/api/recipes/${encodeURIComponent(localId)}`);
+        }
+        if (!resp.ok) {
+          return NextResponse.json({ error: 'Local recipe not found' }, { status: resp.status });
+        }
+        const j = await resp.json();
+        const r = (j && j.recipe) || j;
 
-          // Prepare normalized ingredients (collapse duplicates) and formatted summary
-          type LocalIngredientObj = { name?: string; quantity?: number; unit?: string };
-          let extendedIngredientsArr: Array<{ id: number; name: string; original: string; amount: number; unit: string; }> = [];
-          try {
-            if (Array.isArray(r.ingredients)) {
-              // If ingredients are objects with a `name` field (our Sugran format), map directly
-              if (r.ingredients.length > 0 && typeof r.ingredients[0] === 'object' && (r.ingredients[0] as LocalIngredientObj).name) {
-                let i = 1;
-                for (const ingObjRaw of r.ingredients) {
-                  const ingObj = ingObjRaw as LocalIngredientObj;
-                  const nameRaw = String(ingObj.name || '').trim();
-                  if (!nameRaw) continue;
-                  const canon = await normalizeIngredientName(nameRaw, { prefer: 'fuzzy' });
-                  const name = canon || nameRaw;
-                  extendedIngredientsArr.push({ id: i++, name, original: nameRaw, amount: ingObj.quantity || 0, unit: ingObj.unit || '' });
-                }
-              } else {
-                const map = new Map<string, { originals: string[] }>();
-                for (const ing of r.ingredients) {
-                  const rawIng = String(ing || '').trim();
-                  if (!rawIng) continue;
-                  const canon = await normalizeIngredientName(rawIng, { prefer: 'fuzzy' });
-                  const key = canon || rawIng.toLowerCase();
-                  if (!map.has(key)) map.set(key, { originals: [rawIng] });
-                  else map.get(key)!.originals.push(rawIng);
-                }
-                let i = 1;
-                for (const [name, data] of map.entries()) {
-                  extendedIngredientsArr.push({ id: i++, name, original: data.originals.join(', '), amount: 0, unit: '' });
+        // Prepare normalized ingredients (collapse duplicates) and formatted summary
+        // Prepare normalized ingredients (collapse duplicates) and formatted summary
+        type LocalIngredientObj = {
+          name?: string;
+          quantity?: number | string;
+          amount?: number | string;
+          value?: number | string;
+          unit?: string;
+          original?: string;
+        };
+
+        let extendedIngredientsArr: Array<{ id: number; name: string; original: string; amount: number; unit: string; }> = [];
+
+        const parseAmount = (obj: LocalIngredientObj): number => {
+          const raw = obj.quantity ?? obj.amount ?? obj.value;
+          if (typeof raw === 'number') return raw;
+          if (typeof raw === 'string') {
+            // Handle fractions like "1/2"
+            if (raw.includes('/')) {
+              const [num, den] = raw.split('/').map(n => parseFloat(n.trim()));
+              if (!isNaN(num) && !isNaN(den) && den !== 0) return num / den;
+            }
+            const parsed = parseFloat(raw);
+            return isNaN(parsed) ? 0 : parsed;
+          }
+          return 0;
+        };
+
+        const parseStringIngredient = (raw: string): { amount: number; unit: string; name: string } => {
+          // Basic regex for "2 cups sugar" or "1.5 tsp salt"
+          const match = raw.match(/^([\d\./]+)\s*([a-zA-Z]+)\s+(.+)$/);
+          if (match) {
+            const amountStr = match[1];
+            let amount = 0;
+            if (amountStr.includes('/')) {
+              const [num, den] = amountStr.split('/').map(n => parseFloat(n));
+              amount = (!isNaN(num) && !isNaN(den) && den !== 0) ? num / den : 0;
+            } else {
+              amount = parseFloat(amountStr) || 0;
+            }
+            return { amount, unit: match[2], name: match[3] };
+          }
+          return { amount: 0, unit: '', name: raw };
+        };
+
+        try {
+          if (Array.isArray(r.ingredients)) {
+            // If ingredients are objects with a `name` field (our Sugran format), map directly
+            if (r.ingredients.length > 0 && typeof r.ingredients[0] === 'object' && (r.ingredients[0] as LocalIngredientObj).name) {
+              let i = 1;
+              for (const ingObjRaw of r.ingredients) {
+                const ingObj = ingObjRaw as LocalIngredientObj;
+                const nameRaw = String(ingObj.name || '').trim();
+                if (!nameRaw) continue;
+
+                const canon = await normalizeIngredientName(nameRaw, { prefer: 'fuzzy' });
+                const name = canon || nameRaw;
+                const amount = parseAmount(ingObj);
+                const unit = ingObj.unit || '';
+                const original = ingObj.original || (amount > 0 ? `${amount} ${unit} ${name}` : name);
+
+                extendedIngredientsArr.push({ id: i++, name, original, amount, unit });
+              }
+            } else {
+              // String-only ingredients
+              const map = new Map<string, { originals: string[]; amount: number; unit: string }>();
+              for (const ing of r.ingredients) {
+                const rawIng = String(ing || '').trim();
+                if (!rawIng) continue;
+
+                const { amount, unit, name: extractedName } = parseStringIngredient(rawIng);
+                const canon = await normalizeIngredientName(extractedName, { prefer: 'fuzzy' });
+                const key = canon || extractedName.toLowerCase();
+
+                if (!map.has(key)) {
+                  map.set(key, { originals: [rawIng], amount, unit });
+                } else {
+                  const existing = map.get(key)!;
+                  existing.originals.push(rawIng);
+                  // Accumulate amount if units match or if it's the first time we see a non-zero amount
+                  if (existing.unit === unit || !existing.unit) {
+                    existing.amount += amount;
+                    existing.unit = unit || existing.unit;
+                  }
                 }
               }
+              let i = 1;
+              for (const [name, data] of map.entries()) {
+                extendedIngredientsArr.push({
+                  id: i++,
+                  name,
+                  original: data.originals.join(', '),
+                  amount: data.amount,
+                  unit: data.unit
+                });
+              }
             }
-          } catch (e) {
-            extendedIngredientsArr = Array.isArray(r.ingredients) ? r.ingredients.map((ing: unknown, idx: number) => {
-              const obj = ing as LocalIngredientObj | string;
-              const name = typeof obj === 'string' ? String(obj) : String((obj as LocalIngredientObj).name ?? obj);
-              const amount = typeof obj === 'object' && (obj as LocalIngredientObj).quantity ? (obj as LocalIngredientObj).quantity ?? 0 : 0;
-              const unit = typeof obj === 'object' && (obj as LocalIngredientObj).unit ? (obj as LocalIngredientObj).unit ?? '' : '';
-              return { id: idx + 1, name: name, original: name, amount, unit };
-            }) : [];
           }
-
-          const rawText = r.description || (r.raw && (r.raw.TranslatedInstructions || r.raw.summary)) || '';
-          const summaryHtml = ((): string => {
-            if (!rawText) return '';
-            try {
-              const sentences = String(rawText).replace(/\n+/g, ' ').split(/(?<=[.?!])\s+/).filter(Boolean).map(s => s.trim());
-              return sentences.map(s => `<p>${s.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`).join('');
-            } catch (e) {
-              return String(rawText);
+        } catch (e) {
+          console.error('Error parsing ingredients:', e);
+          // Fallback
+          extendedIngredientsArr = Array.isArray(r.ingredients) ? r.ingredients.map((ing: unknown, idx: number) => {
+            const obj = ing as LocalIngredientObj | string;
+            if (typeof obj === 'string') {
+              return { id: idx + 1, name: obj, original: obj, amount: 0, unit: '' };
             }
-          })();
-
-          // Map recipes-site shape to our expected RecipeDetail lite shape
-          const mapped: any = {
-            id: r.id || recipeId,
-            title: r.title || r.name || (r.raw && r.raw.TranslatedRecipeName) || 'Untitled',
-            image: r.image || r.image_url || r.imageUrl || '',
-            imageType: '',
-            servings: r.servings || 0,
-            readyInMinutes: (r.prep_time_minutes || r.prepTime || 0) + (r.cook_time_minutes || r.cookTime || r.total_minutes || r.totalMinutes || 0),
-            cookingMinutes: undefined,
-            preparationMinutes: undefined,
-            pricePerServing: 0,
-            cheap: false,
-            healthScore: 0,
-            spoonacularScore: 0,
-            cuisines: r.cuisine ? (Array.isArray(r.cuisine) ? r.cuisine : [r.cuisine]) : (Array.isArray(r.cuisines) ? r.cuisines : []),
-            dishTypes: Array.isArray(r.dishTypes) ? r.dishTypes : [],
-            diets: Array.isArray(r.diets) ? r.diets : [],
-            occasions: [],
-            summary: summaryHtml || (r.summary || r.description || ''),
-            extendedIngredients: extendedIngredientsArr,
-            analyzedInstructions: Array.isArray(r.steps) && r.steps.length > 0
-              ? [{ name: '', steps: r.steps.map((s: string, i: number) => ({ number: i + 1, step: s, ingredients: [], equipment: [] })) }]
-              : [],
-          };
-
-          // Cache and return
-          recipeCache.set(recipeId, { data: mapped, timestamp: Date.now() });
-          return NextResponse.json(mapped);
-        } catch (err) {
-          console.error('Local recipe fetch failed:', err);
-          return NextResponse.json({ error: 'Failed to fetch local recipe' }, { status: 500 });
+            const name = String(obj.name ?? 'Ingredient');
+            const amount = parseAmount(obj);
+            return { id: idx + 1, name, original: name, amount, unit: obj.unit || '' };
+          }) : [];
         }
-      }
 
-      if (!isNumericId) {
-        return NextResponse.json(
-          {
-            error: 'Template recipe',
-            message: 'This is a quick suggestion template. Only Spoonacular recipes have full cooking instructions and nutrition info.',
-            isTemplate: true,
-          },
-          { status: 404 }
-        );
+        const rawText = r.description || (r.raw && (r.raw.TranslatedInstructions || r.raw.summary)) || '';
+        const summaryHtml = ((): string => {
+          if (!rawText) return '';
+          try {
+            const sentences = String(rawText).replace(/\n+/g, ' ').split(/(?<=[.?!])\s+/).filter(Boolean).map(s => s.trim());
+            return sentences.map(s => `<p>${s.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>`).join('');
+          } catch (e) {
+            return String(rawText);
+          }
+        })();
+
+        // Map recipes-site shape to our expected RecipeDetail lite shape
+        const mapped: any = {
+          id: r.id || recipeId,
+          title: r.title || r.name || (r.raw && r.raw.TranslatedRecipeName) || 'Untitled',
+          image: r.image || r.image_url || r.imageUrl || '',
+          imageType: '',
+          servings: r.servings || 0,
+          readyInMinutes: (r.prep_time_minutes || r.prepTime || 0) + (r.cook_time_minutes || r.cookTime || r.total_minutes || r.totalMinutes || 0),
+          cookingMinutes: undefined,
+          preparationMinutes: undefined,
+          pricePerServing: 0,
+          cheap: false,
+          healthScore: 0,
+          spoonacularScore: 0,
+          cuisines: r.cuisine ? (Array.isArray(r.cuisine) ? r.cuisine : [r.cuisine]) : (Array.isArray(r.cuisines) ? r.cuisines : []),
+          dishTypes: Array.isArray(r.dishTypes) ? r.dishTypes : [],
+          diets: Array.isArray(r.diets) ? r.diets : [],
+          occasions: [],
+          summary: summaryHtml || (r.summary || r.description || ''),
+          extendedIngredients: extendedIngredientsArr,
+          analyzedInstructions: Array.isArray(r.steps) && r.steps.length > 0
+            ? [{ name: '', steps: r.steps.map((s: string, i: number) => ({ number: i + 1, step: s, ingredients: [], equipment: [] })) }]
+            : [],
+        };
+
+        // Cache and return
+        recipeCache.set(recipeId, { data: mapped, timestamp: Date.now() });
+        return NextResponse.json(mapped);
+      } catch (err) {
+        console.error('Local recipe fetch failed:', err);
+        return NextResponse.json({ error: 'Failed to fetch local recipe' }, { status: 500 });
       }
+    }
+
+    if (!isNumericId) {
+      return NextResponse.json(
+        {
+          error: 'Template recipe',
+          message: 'This is a quick suggestion template. Only Spoonacular recipes have full cooking instructions and nutrition info.',
+          isTemplate: true,
+        },
+        { status: 404 }
+      );
+    }
 
     // Check cache
     const cached = recipeCache.get(recipeId);

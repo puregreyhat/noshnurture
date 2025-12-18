@@ -3,6 +3,7 @@ import { generateSuggestions } from "@/lib/recipes/generator";
 import { normalizeIngredientName } from "@/lib/ingredients/normalize";
 import { normalizeInventoryItems } from "@/lib/ingredients/userInventoryNormalizer";
 import { createClient } from "@/lib/supabase/server";
+import { calculateDaysUntilExpiry } from "@/lib/utils/dateUtils";
 
 export const revalidate = 0; // dynamic, don't cache at edge by default
 
@@ -40,20 +41,7 @@ function determineCuisineFromTitle(title: string): string {
   return 'International';
 }
 
-function calculateDaysUntilExpiry(expiryDate: string): number {
-  if (!expiryDate) return 0;
-  try {
-    const separator = expiryDate.includes('/') ? '/' : '-';
-    const [day, month, year] = expiryDate.split(separator).map(Number);
-    const exp = new Date(year, month - 1, day);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    exp.setHours(0, 0, 0, 0);
-    return Math.floor((exp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  } catch {
-    return 0;
-  }
-}
+
 
 async function getExpiringIngredients(items: Record<string, unknown>[]): Promise<string[]> {
   const expiring = items.filter(i => typeof i.days_until_expiry === 'number' && i.days_until_expiry >= 0 && i.days_until_expiry <= 7);
