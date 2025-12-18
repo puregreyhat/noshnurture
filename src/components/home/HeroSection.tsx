@@ -56,13 +56,6 @@ const HeroSection = () => {
                     <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
                     <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-800 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Link>
-
-                <Link
-                    href="/dashboard"
-                    className="px-8 py-4 bg-white text-stone-700 font-medium rounded-full shadow-sm hover:shadow-md border border-stone-200 hover:border-emerald-200 transition-all hover:-translate-y-1"
-                >
-                    Explore Demo
-                </Link>
             </motion.div>
 
             {/* Floating Elements Background */}
