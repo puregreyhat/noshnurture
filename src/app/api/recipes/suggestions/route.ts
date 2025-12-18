@@ -80,7 +80,7 @@ export async function GET(request: Request) {
     const url = new URL(request.url)
     const source = (url.searchParams.get('source') || 'spoonacular').toString()
     const showAll = url.searchParams.get('all') === 'true';
-    const limit = parseInt(url.searchParams.get('limit') || '50', 10);
+    const limit = parseInt(url.searchParams.get('limit') || '100', 10);
 
     // Get authenticated user
     const supabaseServer = await createClient();

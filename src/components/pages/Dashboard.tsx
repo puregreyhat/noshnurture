@@ -151,8 +151,10 @@ export default function FoodDashboard() {
       try {
         const params = new URLSearchParams();
         params.set('source', 'sugran');
-        if (showOnlySugran) params.set('all', 'true');
-        if (showAllRecipes) params.set('limit', '100');
+        if (showOnlySugran) {
+          params.set('all', 'true');
+          params.set('limit', '100');
+        }
         const url = `/api/recipes/suggestions?${params.toString()}`;
         console.log('[Dashboard] Fetching suggestions from:', url);
 
@@ -549,8 +551,8 @@ export default function FoodDashboard() {
                     setRecipePageIndex(0);
                   }}
                   className={`cursor-pointer relative w-24 h-12 rounded-full transition-all duration-300 ${showVegOnly
-                      ? 'bg-emerald-100 shadow-[inset_2px_2px_5px_rgba(16,185,129,0.3),inset_-2px_-2px_5px_rgba(255,255,255,1)] border-emerald-200'
-                      : 'bg-[#EFEDE6] shadow-[inset_2px_2px_5px_rgba(168,166,158,0.4),inset_-2px_-2px_5px_rgba(255,255,255,1)] border-[#E5E2D9]'
+                    ? 'bg-emerald-100 shadow-[inset_2px_2px_5px_rgba(16,185,129,0.3),inset_-2px_-2px_5px_rgba(255,255,255,1)] border-emerald-200'
+                    : 'bg-[#EFEDE6] shadow-[inset_2px_2px_5px_rgba(168,166,158,0.4),inset_-2px_-2px_5px_rgba(255,255,255,1)] border-[#E5E2D9]'
                     } border p-1`}
                   title={showVegOnly ? "Show All Recipes" : "Show Veg Only"}
                 >
