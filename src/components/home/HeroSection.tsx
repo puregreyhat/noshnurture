@@ -56,6 +56,8 @@ const HeroSection = () => {
                     <ArrowRight className="w-5 h-5 relative z-10 group-hover:translate-x-1 transition-transform" />
                     <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-emerald-800 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </Link>
+
+
             </motion.div>
 
             {/* Floating Elements Background */}
