@@ -20,9 +20,6 @@ const nextConfig: NextConfig = {
   // During CI/CD (Vercel) the Next build runs ESLint which can fail the build.
   // For now, ignore ESLint during build to avoid deployment failures while
   // we iteratively fix lint issues. This mirrors Next.js recommended option.
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
 };
 
 export default nextConfig;
