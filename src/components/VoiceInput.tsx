@@ -216,7 +216,7 @@ export default function VoiceInput({ onProductDetected, onClose }: VoiceInputPro
       setTimeout(() => onClose(), 500);
     } catch (err) {
       console.error('Processing error:', err);
-      setError('Failed to process. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to process. Please try again.');
     } finally {
       setIsProcessing(false);
     }

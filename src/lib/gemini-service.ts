@@ -139,13 +139,7 @@ If you cannot read the date clearly, set confidence to a lower value (0.3-0.7).`
       throw new Error('No response from Gemini API');
     }
 
-    // Parse JSON response from Gemini
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Could not parse Gemini response');
-    }
-
-    const parsedResult = JSON.parse(jsonMatch[0]);
+    const parsedResult = parseJsonFromContent(content);
 
     // Helper function to parse date string to Date object
     const parseDate = (dateStr: string | null): Date | null => {
@@ -268,12 +262,7 @@ If confidence is low (user was unclear), set it to 0.5 or lower.`,
       throw new Error('No response from Gemini API');
     }
 
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Could not parse Gemini response');
-    }
-
-    const parsedResult = JSON.parse(jsonMatch[0]);
+    const parsedResult = parseJsonFromContent(content);
 
     return {
       productName: parsedResult.productName,
@@ -341,12 +330,7 @@ Focus on:
       return [];
     }
 
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      return [];
-    }
-
-    return JSON.parse(jsonMatch[0]);
+    return parseJsonFromContent(content);
   } catch (error) {
     console.error('Error getting recipe suggestions:', error);
     return [];
@@ -435,12 +419,7 @@ Important rules:
       throw new Error('No response from Gemini API');
     }
 
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response');
-    }
-
-    const parsedResult = JSON.parse(jsonMatch[0]);
+    const parsedResult = parseJsonFromContent(content);
 
     return {
       productName: parsedResult.productName || null,
@@ -569,12 +548,7 @@ If the bill contains NO food items, return an empty array: []`,
       throw new Error('No response from Gemini API');
     }
 
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      throw new Error('No JSON found in response');
-    }
-
-    const products = JSON.parse(jsonMatch[0]) as BillProduct[];
+    const products = parseJsonFromContent(content) as BillProduct[];
     return products;
   } catch (error) {
     console.error('Error extracting products from bill:', error);
@@ -660,3 +634,44 @@ If you cannot parse the date, return "INVALID"`,
 }
 
 export type { BillProduct };
+
+/**
+ * Helper to parse JSON from Gemini response
+ * Handles markdown code blocks and raw JSON
+ */
+function parseJsonFromContent(content: string): any {
+  try {
+    // 1. Extract from Code Block if present
+    const codeBlock = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlock) {
+      content = codeBlock[1];
+    }
+
+    // 2. Find JSON object or array
+    const firstBrace = content.indexOf('{');
+    const firstBracket = content.indexOf('[');
+
+    let start = -1;
+    let end = -1;
+
+    // Determine if we are looking for object or array (whichever comes first)
+    if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+      start = firstBrace;
+      end = content.lastIndexOf('}');
+    } else if (firstBracket !== -1) {
+      start = firstBracket;
+      end = content.lastIndexOf(']');
+    }
+
+    if (start !== -1 && end !== -1 && end > start) {
+      const jsonStr = content.substring(start, end + 1);
+      return JSON.parse(jsonStr);
+    }
+
+    throw new Error('No JSON found in response');
+  } catch (error) {
+    console.error('JSON parsing error:', error);
+    throw new Error('Could not parse Gemini response');
+  }
+}
+
