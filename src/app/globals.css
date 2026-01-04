@@ -1,0 +1,332 @@
+@import "tailwindcss";
+
+:root {
+  --background: #FDFBF7; /* Warm cream */
+  --foreground: #2C3E50; /* Deep charcoal/green */
+  --card-bg: #FFFFFF;
+  --card-border: #E7E5E4; /* Stone-200 */
+  --primary: #047857; /* Emerald-700 */
+  --accent: #D97706; /* Amber-600 */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card-bg);
+  --color-card-border: var(--card-border);
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-playfair);
+  
+  --animate-fade-in: fade-in 0.5s ease-out forwards;
+  --animate-slide-in-up: slide-in-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  --animate-slide-in-down: slide-in-down 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  --animate-slide-in-left: slide-in-left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  --animate-slide-in-right: slide-in-right 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  --animate-scale-in: scale-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  --animate-bounce-in: bounce-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Force light mode/earthy theme for consistency */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #FDFBF7;
+    --foreground: #2C3E50;
+  }
+}
+
+/* ==================== KEYFRAME ANIMATIONS ==================== */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 30px rgba(16, 185, 129, 0.5);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes floatMove {
+  0%, 100% { 
+    transform: translateY(0px); 
+  }
+  50% { 
+    transform: translateY(-20px); 
+  }
+}
+
+@keyframes intenseGlow {
+  0%, 100% { 
+    filter: drop-shadow(0 0 10px rgba(0,150,90,0.8)) 
+            drop-shadow(0 0 20px rgba(0,150,90,0.6))
+            drop-shadow(0 0 30px rgba(0,150,90,0.4));
+  }
+  50% { 
+    filter: drop-shadow(0 0 30px rgba(0,150,90,1)) 
+            drop-shadow(0 0 50px rgba(0,150,90,1))
+            drop-shadow(0 0 70px rgba(0,150,90,0.8));
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes rotate-gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* ==================== UTILITY ANIMATION CLASSES ==================== */
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out;
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-slide-in-down {
+  animation: slide-in-down 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-scale-in {
+  animation: scale-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-float-glow {
+  animation: floatMove 3s ease-in-out infinite, intenseGlow 1.5s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-rotate-gradient {
+  background-size: 200% 200%;
+  animation: rotate-gradient 3s ease infinite;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Print Styles for PDF Export */
+@media print {
+  @page {
+    size: A4;
+    margin: 1.5cm;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  button {
+    display: none !important;
+  }
+
+  .backdrop-blur-xl {
+    backdrop-filter: none;
+  }
+
+  /* Force page breaks before major sections */
+  h1 {
+    page-break-before: always;
+    break-before: page;
+    margin-top: 0;
+  }
+
+  h1:first-of-type {
+    page-break-before: avoid;
+    break-before: avoid;
+  }
+
+  /* Prevent awkward page breaks */
+  h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    break-after: avoid;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Keep sections and cards together */
+  section, 
+  .rounded-3xl, 
+  .rounded-2xl,
+  [class*="backdrop-blur"] {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 2rem;
+  }
+
+  /* Ensure tables and charts don't break */
+  table, 
+  svg,
+  .space-y-4,
+  .space-y-3,
+  .space-y-6 {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Control grid layouts in print - convert to single column */
+  .grid {
+    display: block !important;
+  }
+
+  .grid > * {
+    width: 100% !important;
+    margin-bottom: 1.5rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Specific fixes for dashboard cards */
+  [class*="grid-cols"] > div {
+    display: block !important;
+    margin-bottom: 1rem !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Prevent orphaned content */
+  p, li {
+    orphans: 3;
+    widows: 3;
+  }
+}
