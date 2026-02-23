@@ -1,0 +1,3882 @@
+
+> frontend@0.1.1 dev
+> next dev --turbopack
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /Users/akash/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /Users/akash/Downloads/Compressed/noshnurture-main/package-lock.json
+
+   ▲ Next.js 16.0.10 (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://192.168.0.101:3000
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1090ms
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: undefined
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter (Llama 3)...
+[HeyNosh] OpenRouter Fallback failed: 429 Too Many Requests Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+HeyNosh API Error: Error: Both AI Providers Failed (Gemini & OpenRouter)
+    at POST (src/app/api/heynosh/route.ts:226:27)
+  224 |                     const errorText = await orRes.text();
+  225 |                     console.error("[HeyNosh] OpenRouter Fallback failed:", orRes.status, orRes.statusText, "Body:", errorText);
+> 226 |                     throw new Error(`Both AI Providers Failed (Gemini & OpenRouter)`);
+      |                           ^
+  227 |                 }
+  228 |             } else {
+  229 |                 throw geminiError; // No fallback available, throw original error
+ POST /api/heynosh 500 in 2.9s (compile: 338ms, render: 2.6s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: undefined
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: mistralai/mistral-small-3.1-24b-instruct:free
+[HeyNosh] OpenRouter model mistralai/mistral-small-3.1-24b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3-27b-it:free
+[HeyNosh] OpenRouter model google/gemma-3-27b-it:free failed: 400 Body: {"error":{"message":"Provider returned error","code":400,"metadata":{"raw":"{\n  \"error\": {\n    \"code\": 400,\n    \"message\": \"Developer instruction is not enabled for models/gemma-3-27b-it\",\n    \"status\": \"INVALID_ARGUMENT\"\n  }\n}\n","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: meta-llama/llama-3.3-70b-instruct:free
+[HeyNosh] OpenRouter model meta-llama/llama-3.3-70b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: qwen/qwen3-coder:free
+[HeyNosh] OpenRouter model qwen/qwen3-coder:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"qwen/qwen3-coder:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] ALL OpenRouter Fallback models failed due to upstream rate limits.
+HeyNosh API Error: Error: Both AI Providers Failed (Gemini & OpenRouter Rate Limits)
+    at POST (src/app/api/heynosh/route.ts:250:27)
+  248 |                 if (!orSuccess) {
+  249 |                     console.error("[HeyNosh] ALL OpenRouter Fallback models failed due to upstream rate limits.");
+> 250 |                     throw new Error(`Both AI Providers Failed (Gemini & OpenRouter Rate Limits)`);
+      |                           ^
+  251 |                 }
+  252 |
+  253 |             } else {
+ POST /api/heynosh 500 in 3.9s (compile: 51ms, render: 3.8s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: undefined
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: mistralai/mistral-small-3.1-24b-instruct:free
+[HeyNosh] OpenRouter model mistralai/mistral-small-3.1-24b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3-27b-it:free
+ POST /api/heynosh 200 in 4.0s (compile: 50ms, render: 3.9s)
+ ○ Compiling / ...
+ GET / 200 in 5.8s (compile: 5.4s, render: 386ms)
+ GET /dashboard 200 in 592ms (compile: 527ms, render: 65ms)
+ GET /dashboard 200 in 41ms (compile: 4ms, render: 37ms)
+ GET /dashboard 200 in 23ms (compile: 3ms, render: 20ms)
+ GET /api/recipes/suggestions?source=sugran&all=true&limit=100 200 in 2.1s (compile: 192ms, render: 1917ms)
+ GET /api/recipes/suggestions?source=sugran&all=true&limit=100 200 in 1024ms (compile: 7ms, render: 1017ms)
+ GET /api/recipes/suggestions?source=sugran&all=true&limit=100 200 in 584ms (compile: 4ms, render: 580ms)
+ POST /api/telegram/send-recipes 200 in 2.0s (compile: 320ms, render: 1713ms)
+ GET /api/recipes/suggestions?source=sugran&all=true&limit=100 200 in 920ms (compile: 6ms, render: 914ms)
+ GET /heynosh 200 in 1965ms (compile: 1593ms, render: 372ms)
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: null
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: mistralai/mistral-small-3.1-24b-instruct:free
+[HeyNosh] OpenRouter model mistralai/mistral-small-3.1-24b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3-27b-it:free
+ POST /api/heynosh 200 in 6.9s (compile: 7ms, render: 6.9s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: null
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: mistralai/mistral-small-3.1-24b-instruct:free
+[HeyNosh] OpenRouter model mistralai/mistral-small-3.1-24b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3-27b-it:free
+[HeyNosh] OpenRouter model google/gemma-3-27b-it:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: meta-llama/llama-3.3-70b-instruct:free
+[HeyNosh] OpenRouter model meta-llama/llama-3.3-70b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: qwen/qwen3-coder:free
+[HeyNosh] OpenRouter model qwen/qwen3-coder:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"qwen/qwen3-coder:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] ALL OpenRouter Fallback models failed due to upstream rate limits.
+HeyNosh API Error: Error: Both AI Providers Failed (Gemini & OpenRouter Rate Limits)
+    at POST (src/app/api/heynosh/route.ts:249:27)
+  247 |                 if (!orSuccess) {
+  248 |                     console.error("[HeyNosh] ALL OpenRouter Fallback models failed due to upstream rate limits.");
+> 249 |                     throw new Error(`Both AI Providers Failed (Gemini & OpenRouter Rate Limits)`);
+      |                           ^
+  250 |                 }
+  251 |
+  252 |             } else {
+ POST /api/heynosh 500 in 4.7s (compile: 15ms, render: 4.7s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: undefined
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: mistralai/mistral-small-3.1-24b-instruct:free
+[HeyNosh] OpenRouter model mistralai/mistral-small-3.1-24b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"mistralai/mistral-small-3.1-24b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3-27b-it:free
+[HeyNosh] OpenRouter model google/gemma-3-27b-it:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemma-3-27b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: meta-llama/llama-3.3-70b-instruct:free
+[HeyNosh] OpenRouter model meta-llama/llama-3.3-70b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"meta-llama/llama-3.3-70b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: qwen/qwen3-coder:free
+[HeyNosh] OpenRouter model qwen/qwen3-coder:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"qwen/qwen3-coder:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] ALL OpenRouter Fallback models failed due to upstream rate limits.
+HeyNosh API Error: Error: Both AI Providers Failed (Gemini & OpenRouter Rate Limits)
+    at POST (src/app/api/heynosh/route.ts:249:27)
+  247 |                 if (!orSuccess) {
+  248 |                     console.error("[HeyNosh] ALL OpenRouter Fallback models failed due to upstream rate limits.");
+> 249 |                     throw new Error(`Both AI Providers Failed (Gemini & OpenRouter Rate Limits)`);
+      |                           ^
+  250 |                 }
+  251 |
+  252 |             } else {
+ POST /api/heynosh 500 in 4.0s (compile: 3ms, render: 4.0s)
+HeyNosh Route -> Resolved Intent directly: {
+  intent: 'get_expiring_items',
+  parameters: { days: 7, timeframe: 'this_week' }
+}
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Cookwell Oregano",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-09-2026"
+  },
+  {
+    "product_name": "Cookwell Pasta Mix",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-04-2026"
+  },
+  {
+    "product_name": "Maggie",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "24-11-2025"
+  },
+  {
+    "product_name": "Cookwell Past mix",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Cookwell oregano",
+    "quantity": 1,
+    "unit": "Packet",
+    "expiry_date": "30-11-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "12-12-2025"
+  },
+  {
+    "product_name": "bread",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "26-11-2025"
+  },
+  {
+    "product_name": "milk",
+    "quantity": 1,
+    "unit": "liter",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "apples",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "28-12-2025"
+  },
+  {
+    "product_name": "Spinach",
+    "quantity": 220,
+    "unit": "g",
+    "expiry_date": "01-12-2025"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Rice",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "18-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 4,
+    "unit": "kg",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "08-01-2026"
+  },
+  {
+    "product_name": "chicken",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "onion",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "potatoes",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "18-12-2025"
+  },
+  {
+    "product_name": "BRITANNIA BISCUITS",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Besan",
+    "quantity": 500,
+    "unit": "g",
+    "expiry_date": "16-07-2026"
+  },
+  {
+    "product_name": "Chocolate Powder",
+    "quantity": 120,
+    "unit": "g",
+    "expiry_date": "20-01-2026"
+  },
+  {
+    "product_name": "Onion",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "tomato 1",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Atta",
+    "quantity": 10,
+    "unit": "kg",
+    "expiry_date": "17-04-2026"
+  },
+  {
+    "product_name": "Capsicum",
+    "quantity": 350,
+    "unit": "grams",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 453,
+    "unit": "gram",
+    "expiry_date": "07-02-2026"
+  },
+  {
+    "product_name": "Moong Dal",
+    "quantity": 600,
+    "unit": "grams",
+    "expiry_date": "17-01-2027"
+  },
+  {
+    "product_name": "Nestle Coffee Powder",
+    "quantity": 300,
+    "unit": "grams",
+    "expiry_date": "25-03-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+[HeyNosh] OpenRouter model google/gemma-3-12b-it:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemma-3-12b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3n-e4b-it:free
+ POST /api/heynosh 200 in 4.8s (compile: 82ms, render: 4.7s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: null
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 6.2s (compile: 3ms, render: 6.2s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: null
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 8.5s (compile: 3ms, render: 8.5s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Cookwell Oregano",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-09-2026"
+  },
+  {
+    "product_name": "Cookwell Pasta Mix",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-04-2026"
+  },
+  {
+    "product_name": "Maggie",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "24-11-2025"
+  },
+  {
+    "product_name": "Cookwell Past mix",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Cookwell oregano",
+    "quantity": 1,
+    "unit": "Packet",
+    "expiry_date": "30-11-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "12-12-2025"
+  },
+  {
+    "product_name": "bread",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "26-11-2025"
+  },
+  {
+    "product_name": "milk",
+    "quantity": 1,
+    "unit": "liter",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "apples",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "28-12-2025"
+  },
+  {
+    "product_name": "Spinach",
+    "quantity": 220,
+    "unit": "g",
+    "expiry_date": "01-12-2025"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Rice",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "18-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 4,
+    "unit": "kg",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "08-01-2026"
+  },
+  {
+    "product_name": "chicken",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "onion",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "potatoes",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "18-12-2025"
+  },
+  {
+    "product_name": "BRITANNIA BISCUITS",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Besan",
+    "quantity": 500,
+    "unit": "g",
+    "expiry_date": "16-07-2026"
+  },
+  {
+    "product_name": "Chocolate Powder",
+    "quantity": 120,
+    "unit": "g",
+    "expiry_date": "20-01-2026"
+  },
+  {
+    "product_name": "Onion",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "tomato 1",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Atta",
+    "quantity": 10,
+    "unit": "kg",
+    "expiry_date": "17-04-2026"
+  },
+  {
+    "product_name": "Capsicum",
+    "quantity": 350,
+    "unit": "grams",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 453,
+    "unit": "gram",
+    "expiry_date": "07-02-2026"
+  },
+  {
+    "product_name": "Moong Dal",
+    "quantity": 600,
+    "unit": "grams",
+    "expiry_date": "17-01-2027"
+  },
+  {
+    "product_name": "Nestle Coffee Powder",
+    "quantity": 300,
+    "unit": "grams",
+    "expiry_date": "25-03-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 5.9s (compile: 1349µs, render: 5.9s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Cookwell Oregano",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-09-2026"
+  },
+  {
+    "product_name": "Cookwell Pasta Mix",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-04-2026"
+  },
+  {
+    "product_name": "Maggie",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "24-11-2025"
+  },
+  {
+    "product_name": "Cookwell Past mix",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Cookwell oregano",
+    "quantity": 1,
+    "unit": "Packet",
+    "expiry_date": "30-11-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "12-12-2025"
+  },
+  {
+    "product_name": "bread",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "26-11-2025"
+  },
+  {
+    "product_name": "milk",
+    "quantity": 1,
+    "unit": "liter",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "apples",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "28-12-2025"
+  },
+  {
+    "product_name": "Spinach",
+    "quantity": 220,
+    "unit": "g",
+    "expiry_date": "01-12-2025"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Rice",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "18-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 4,
+    "unit": "kg",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "08-01-2026"
+  },
+  {
+    "product_name": "chicken",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "onion",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "potatoes",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "18-12-2025"
+  },
+  {
+    "product_name": "BRITANNIA BISCUITS",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Besan",
+    "quantity": 500,
+    "unit": "g",
+    "expiry_date": "16-07-2026"
+  },
+  {
+    "product_name": "Chocolate Powder",
+    "quantity": 120,
+    "unit": "g",
+    "expiry_date": "20-01-2026"
+  },
+  {
+    "product_name": "Onion",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "tomato 1",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Atta",
+    "quantity": 10,
+    "unit": "kg",
+    "expiry_date": "17-04-2026"
+  },
+  {
+    "product_name": "Capsicum",
+    "quantity": 350,
+    "unit": "grams",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 453,
+    "unit": "gram",
+    "expiry_date": "07-02-2026"
+  },
+  {
+    "product_name": "Moong Dal",
+    "quantity": 600,
+    "unit": "grams",
+    "expiry_date": "17-01-2027"
+  },
+  {
+    "product_name": "Nestle Coffee Powder",
+    "quantity": 300,
+    "unit": "grams",
+    "expiry_date": "25-03-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+[HeyNosh] OpenRouter model google/gemma-3-12b-it:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemma-3-12b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3n-e4b-it:free
+ POST /api/heynosh 200 in 4.1s (compile: 80ms, render: 4.0s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: undefined
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 4.8s (compile: 1422µs, render: 4.8s)
+ GET /heynosh 200 in 69ms (compile: 10ms, render: 59ms)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 5.6s (compile: 6ms, render: 5.6s)
+HeyNosh Route -> Resolved Intent directly: {
+  intent: 'get_expiring_items',
+  parameters: { days: 7, timeframe: 'this_week' }
+}
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Cookwell Oregano",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-09-2026"
+  },
+  {
+    "product_name": "Cookwell Pasta Mix",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-04-2026"
+  },
+  {
+    "product_name": "Maggie",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "24-11-2025"
+  },
+  {
+    "product_name": "Cookwell Past mix",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Cookwell oregano",
+    "quantity": 1,
+    "unit": "Packet",
+    "expiry_date": "30-11-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "12-12-2025"
+  },
+  {
+    "product_name": "bread",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "26-11-2025"
+  },
+  {
+    "product_name": "milk",
+    "quantity": 1,
+    "unit": "liter",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "apples",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "28-12-2025"
+  },
+  {
+    "product_name": "Spinach",
+    "quantity": 220,
+    "unit": "g",
+    "expiry_date": "01-12-2025"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Rice",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "18-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 4,
+    "unit": "kg",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "08-01-2026"
+  },
+  {
+    "product_name": "chicken",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "onion",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "potatoes",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "18-12-2025"
+  },
+  {
+    "product_name": "BRITANNIA BISCUITS",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Besan",
+    "quantity": 500,
+    "unit": "g",
+    "expiry_date": "16-07-2026"
+  },
+  {
+    "product_name": "Chocolate Powder",
+    "quantity": 120,
+    "unit": "g",
+    "expiry_date": "20-01-2026"
+  },
+  {
+    "product_name": "Onion",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "tomato 1",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Atta",
+    "quantity": 10,
+    "unit": "kg",
+    "expiry_date": "17-04-2026"
+  },
+  {
+    "product_name": "Capsicum",
+    "quantity": 350,
+    "unit": "grams",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 453,
+    "unit": "gram",
+    "expiry_date": "07-02-2026"
+  },
+  {
+    "product_name": "Moong Dal",
+    "quantity": 600,
+    "unit": "grams",
+    "expiry_date": "17-01-2027"
+  },
+  {
+    "product_name": "Nestle Coffee Powder",
+    "quantity": 300,
+    "unit": "grams",
+    "expiry_date": "25-03-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 9.7s (compile: 82ms, render: 9.6s)
+ GET /heynosh 200 in 51ms (compile: 4ms, render: 47ms)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+[HeyNosh] OpenRouter model google/gemma-3-12b-it:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemma-3-12b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3n-e4b-it:free
+ POST /api/heynosh 200 in 3.8s (compile: 3ms, render: 3.8s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Cookwell Oregano",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-09-2026"
+  },
+  {
+    "product_name": "Cookwell Pasta Mix",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-04-2026"
+  },
+  {
+    "product_name": "Maggie",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "24-11-2025"
+  },
+  {
+    "product_name": "Cookwell Past mix",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Cookwell oregano",
+    "quantity": 1,
+    "unit": "Packet",
+    "expiry_date": "30-11-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "12-12-2025"
+  },
+  {
+    "product_name": "bread",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "26-11-2025"
+  },
+  {
+    "product_name": "milk",
+    "quantity": 1,
+    "unit": "liter",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "apples",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "28-12-2025"
+  },
+  {
+    "product_name": "Spinach",
+    "quantity": 220,
+    "unit": "g",
+    "expiry_date": "01-12-2025"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Rice",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "18-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 4,
+    "unit": "kg",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "08-01-2026"
+  },
+  {
+    "product_name": "chicken",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "onion",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "potatoes",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "18-12-2025"
+  },
+  {
+    "product_name": "BRITANNIA BISCUITS",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Besan",
+    "quantity": 500,
+    "unit": "g",
+    "expiry_date": "16-07-2026"
+  },
+  {
+    "product_name": "Chocolate Powder",
+    "quantity": 120,
+    "unit": "g",
+    "expiry_date": "20-01-2026"
+  },
+  {
+    "product_name": "Onion",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "tomato 1",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Atta",
+    "quantity": 10,
+    "unit": "kg",
+    "expiry_date": "17-04-2026"
+  },
+  {
+    "product_name": "Capsicum",
+    "quantity": 350,
+    "unit": "grams",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 453,
+    "unit": "gram",
+    "expiry_date": "07-02-2026"
+  },
+  {
+    "product_name": "Moong Dal",
+    "quantity": 600,
+    "unit": "grams",
+    "expiry_date": "17-01-2027"
+  },
+  {
+    "product_name": "Nestle Coffee Powder",
+    "quantity": 300,
+    "unit": "grams",
+    "expiry_date": "25-03-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 6.3s (compile: 74ms, render: 6.2s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 7.8s (compile: 2ms, render: 7.8s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+[HeyNosh] OpenRouter model google/gemma-3-12b-it:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemma-3-12b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3n-e4b-it:free
+ POST /api/heynosh 200 in 5.2s (compile: 5ms, render: 5.1s)
+ GET / 200 in 70ms (compile: 5ms, render: 66ms)
+ GET /dashboard 200 in 72ms (compile: 6ms, render: 67ms)
+ GET /dashboard 200 in 55ms (compile: 3ms, render: 52ms)
+ GET /dashboard 200 in 25ms (compile: 4ms, render: 21ms)
+ GET /api/recipes/suggestions?source=sugran&all=true&limit=100 200 in 1681ms (compile: 3ms, render: 1678ms)
+ GET /api/recipes/suggestions?source=sugran&all=true&limit=100 200 in 618ms (compile: 3ms, render: 616ms)
+ GET /inventory 200 in 643ms (compile: 505ms, render: 138ms)
+ GET /api/recipes/suggestions?source=sugran&all=true&limit=100 200 in 603ms (compile: 3ms, render: 600ms)
+ POST /api/telegram/send-recipes 200 in 1219ms (compile: 3ms, render: 1216ms)
+ GET /api/recipes/suggestions?source=sugran&all=true&limit=100 200 in 778ms (compile: 1774µs, render: 777ms)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Cookwell Oregano",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-09-2026"
+  },
+  {
+    "product_name": "Cookwell Pasta Mix",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "30-04-2026"
+  },
+  {
+    "product_name": "Maggie",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "24-11-2025"
+  },
+  {
+    "product_name": "Cookwell Past mix",
+    "quantity": 1,
+    "unit": "packet",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "Cookwell oregano",
+    "quantity": 1,
+    "unit": "Packet",
+    "expiry_date": "30-11-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "12-12-2025"
+  },
+  {
+    "product_name": "bread",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "26-11-2025"
+  },
+  {
+    "product_name": "milk",
+    "quantity": 1,
+    "unit": "liter",
+    "expiry_date": "28-11-2025"
+  },
+  {
+    "product_name": "apples",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "28-12-2025"
+  },
+  {
+    "product_name": "Spinach",
+    "quantity": 220,
+    "unit": "g",
+    "expiry_date": "01-12-2025"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Rice",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "18-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 4,
+    "unit": "kg",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "08-01-2026"
+  },
+  {
+    "product_name": "chicken",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "onion",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "01-01-2026"
+  },
+  {
+    "product_name": "tomato",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "potatoes",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "18-12-2025"
+  },
+  {
+    "product_name": "BRITANNIA BISCUITS",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "21-12-2025"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "23-12-2025"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-12-2025"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 50,
+    "unit": "gram",
+    "expiry_date": "22-12-2025"
+  },
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "Tomato",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Besan",
+    "quantity": 500,
+    "unit": "g",
+    "expiry_date": "16-07-2026"
+  },
+  {
+    "product_name": "Chocolate Powder",
+    "quantity": 120,
+    "unit": "g",
+    "expiry_date": "20-01-2026"
+  },
+  {
+    "product_name": "Onion",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "Potato",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "31-01-2026"
+  },
+  {
+    "product_name": "tomato 1",
+    "quantity": 5,
+    "unit": "kg",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Aashirvaad Atta",
+    "quantity": 10,
+    "unit": "kg",
+    "expiry_date": "17-04-2026"
+  },
+  {
+    "product_name": "Capsicum",
+    "quantity": 350,
+    "unit": "grams",
+    "expiry_date": "22-01-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 453,
+    "unit": "gram",
+    "expiry_date": "07-02-2026"
+  },
+  {
+    "product_name": "Moong Dal",
+    "quantity": 600,
+    "unit": "grams",
+    "expiry_date": "17-01-2027"
+  },
+  {
+    "product_name": "Nestle Coffee Powder",
+    "quantity": 300,
+    "unit": "grams",
+    "expiry_date": "25-03-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "Kitchen King Masala",
+    "quantity": 50,
+    "unit": "g",
+    "expiry_date": "30-11-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+[HeyNosh] OpenRouter model google/gemma-3-12b-it:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemma-3-12b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: google/gemma-3n-e4b-it:free
+[HeyNosh] OpenRouter model google/gemma-3n-e4b-it:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"google/gemma-3n-e4b-it:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Google AI Studio","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: meta-llama/llama-3.2-3b-instruct:free
+[HeyNosh] OpenRouter model meta-llama/llama-3.2-3b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"meta-llama/llama-3.2-3b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] Trying OpenRouter model: qwen/qwen3-next-80b-a3b-instruct:free
+[HeyNosh] OpenRouter model qwen/qwen3-next-80b-a3b-instruct:free failed: 429 Body: {"error":{"message":"Provider returned error","code":429,"metadata":{"raw":"qwen/qwen3-next-80b-a3b-instruct:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations","provider_name":"Venice","is_byok":false}},"user_id":"user_3A2RdvsjLvCK08hVtIGGJ5lpfl7"}
+[HeyNosh] ALL OpenRouter Fallback models failed due to upstream rate limits.
+HeyNosh API Error: Error: Both AI Providers Failed (Gemini & OpenRouter Rate Limits)
+    at POST (src/app/api/heynosh/route.ts:250:27)
+  248 |                 if (!orSuccess) {
+  249 |                     console.error("[HeyNosh] ALL OpenRouter Fallback models failed due to upstream rate limits.");
+> 250 |                     throw new Error(`Both AI Providers Failed (Gemini & OpenRouter Rate Limits)`);
+      |                           ^
+  251 |                 }
+  252 |
+  253 |             } else {
+ POST /api/heynosh 500 in 3.8s (compile: 88ms, render: 3.7s)
+ GET /heynosh 200 in 68ms (compile: 11ms, render: 57ms)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 7.7s (compile: 7ms, render: 7.7s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'get_inventory', parameters: {} }
+HeyNosh - Raw DB Context fetched: [
+  {
+    "product_name": "Unknown Product",
+    "quantity": 1,
+    "unit": "item",
+    "expiry_date": "31-10-2026"
+  },
+  {
+    "product_name": "Gokul Milk 500Ml",
+    "quantity": 4,
+    "unit": "PC",
+    "expiry_date": "20-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "Maida",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "15-01-2026"
+  },
+  {
+    "product_name": "Butter",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "Suger",
+    "quantity": 2,
+    "unit": "kg",
+    "expiry_date": "21-05-2026"
+  },
+  {
+    "product_name": "Eggs",
+    "quantity": 5,
+    "unit": "pieces",
+    "expiry_date": "19-03-2026"
+  },
+  {
+    "product_name": "Vanilla extract",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "10-04-2026"
+  },
+  {
+    "product_name": "salt",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "03-04-2026"
+  },
+  {
+    "product_name": "chocolate chips",
+    "quantity": 1,
+    "unit": "unit",
+    "expiry_date": "25-12-2025"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "atta",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "19-12-2026"
+  },
+  {
+    "product_name": "good day biscuits",
+    "quantity": 100,
+    "unit": "grams",
+    "expiry_date": "19-01-2026"
+  },
+  {
+    "product_name": "oreo biscuist",
+    "quantity": 150,
+    "unit": "grams",
+    "expiry_date": "02-01-2026"
+  },
+  {
+    "product_name": "garlic",
+    "quantity": 250,
+    "unit": "g",
+    "expiry_date": "03-02-2026"
+  },
+  {
+    "product_name": "green chilly",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "peanuts",
+    "quantity": 100,
+    "unit": "g",
+    "expiry_date": "07-01-2026"
+  },
+  {
+    "product_name": "tomatoes",
+    "quantity": 1,
+    "unit": "kg",
+    "expiry_date": "02-03-2026"
+  }
+]
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 7.2s (compile: 3ms, render: 7.2s)
+HeyNosh Route -> Resolved Intent directly: { intent: 'smalltalk', parameters: {} }
+HeyNosh - Raw DB Context fetched: null
+[HeyNosh] Gemini Error: Too Many Requests. Attempting fallback...
+[HeyNosh] Falling back to OpenRouter free models...
+[HeyNosh] Trying OpenRouter model: google/gemma-3-12b-it:free
+ POST /api/heynosh 200 in 9.8s (compile: 5ms, render: 9.7s)

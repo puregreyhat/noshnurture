@@ -6,6 +6,8 @@
 
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const { text } = await request.json();
@@ -54,8 +56,9 @@ export async function POST(request: Request) {
     }
 
     if (
-      (has(['what can i cook', 'suggest a dish', 'recipe ideas', 'what should i prepare', 'what can i make']) && has(['today'])) ||
-      has(cookTodayPhrases)
+      has(['what can i cook', 'suggest a dish', 'recipe ideas', 'what should i prepare', 'what can i make', 'recipes can i make']) ||
+      has(cookTodayPhrases) ||
+      (has(['recipe', 'recipes']) && has(['make', 'cook', 'prepare']))
     ) {
       return NextResponse.json({
         intent: 'get_makeable_recipes',
@@ -66,10 +69,14 @@ export async function POST(request: Request) {
 
     // Fallbacks
     if (has(['inventory', 'what do i have', 'what i have'])) {
-      return NextResponse.json({ intent: 'get_inventory', parameters: {}, confidence: 0.9 });
+      const resp = { intent: 'get_inventory', parameters: {}, confidence: 0.9 };
+      console.log("HeyNosh Intent Router:", resp);
+      return NextResponse.json(resp);
     }
 
-    return NextResponse.json({ intent: 'smalltalk', parameters: {}, confidence: 0.5 });
+    const fallbackResp = { intent: 'smalltalk', parameters: {}, confidence: 0.5 };
+    console.log("HeyNosh Intent Router:", fallbackResp);
+    return NextResponse.json(fallbackResp);
   } catch (err) {
     return NextResponse.json({ error: 'Bad Request' }, { status: 400 });
   }
