@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { parseWakePhrase, resolveWakeModeFromEnv, shouldRequireWakeWord } from '@/lib/voice-assistant/wake';
+import { resolveDeterministicIntent } from '@/lib/voice-assistant/deterministic-intent';
 
 // Configuration
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -32,6 +34,38 @@ export async function POST(request: Request) {
             bodyText = "What do I have in my inventory?";
         }
 
+        const wakeMode = resolveWakeModeFromEnv();
+        const wakeRequired = shouldRequireWakeWord();
+        const wakeParsed = parseWakePhrase(bodyText);
+
+        if (wakeRequired && !wakeParsed.detected) {
+            return NextResponse.json(
+                {
+                    error: 'Wake word not detected',
+                    message: 'Say "Hey Nosh" before your command, or switch to push-to-talk mode.',
+                    wakeMode,
+                    wakeRequired,
+                    wakeDetected: false,
+                },
+                { status: 428 }
+            );
+        }
+
+        const effectiveQuery = wakeParsed.query || bodyText;
+
+        if (!effectiveQuery.trim()) {
+            return NextResponse.json(
+                {
+                    error: 'Empty command after wake phrase',
+                    message: 'I heard the wake phrase. Please ask your command after saying Hey Nosh.',
+                    wakeMode,
+                    wakeRequired,
+                    wakeDetected: wakeParsed.detected,
+                },
+                { status: 400 }
+            );
+        }
+
         // Since we need to use the user's Supabase session to get inventory data,
         // we assume the token is the user ID or we bypass auth for the specific user
         // For standard NoshNurture, we use the server client
@@ -47,26 +81,8 @@ export async function POST(request: Request) {
             console.warn("HeyNosh Warn: No authenticated user found. Data may be empty.");
         }
 
-        // 3. Determine the Intent deterministically
-        const q = String(bodyText || '').trim().toLowerCase();
-        const has = (phrases: string[]) => phrases.some((p) => q.includes(p));
-
-        const weekPhrases = ['this week', 'next 7 days', 'go bad this week', 'expiring this week'];
-        const cookTodayPhrases = ['cook today', "today's meal", 'make today', 'today', 'whip up today', 'prepare for today'];
-
-        let intentData = { intent: 'smalltalk', parameters: {} };
-
-        if ((has(['expire', 'expiring', 'expiry', 'go bad', 'expired']) && has(weekPhrases)) || has(['expiring this week', 'go bad this week']) || has(['already expired', 'are expired'])) {
-            intentData = { intent: 'get_expiring_items', parameters: { days: 7, timeframe: 'this_week' } as any };
-        } else if (
-            has(['what can i cook', 'suggest a dish', 'recipe ideas', 'what should i prepare', 'what can i make', 'recipes can i make']) ||
-            has(cookTodayPhrases) ||
-            (has(['recipe', 'recipes']) && has(['make', 'cook', 'prepare', 'can']))
-        ) {
-            intentData = { intent: 'get_makeable_recipes', parameters: { timeframe: 'today' } };
-        } else if (has(['inventory', 'what do i have', 'what i have', 'how much', 'how many', 'do i have', 'is there any', 'are there any'])) {
-            intentData = { intent: 'get_inventory', parameters: {} };
-        }
+        // 3. Determine the intent deterministically from wake-stripped query text
+        const intentData = resolveDeterministicIntent(effectiveQuery);
 
         console.log("HeyNosh Route -> Resolved Intent directly:", intentData);
 
@@ -164,7 +180,7 @@ Response Guidelines:
 - Add a tiny bit of personality (like a lighthearted culinary remark about cooking).
 - Output ONLY the spoken text, without markdown, emojis, or formatting.`;
 
-        const promptText = `User Query: "${bodyText}"
+        const promptText = `User Query: "${effectiveQuery}"
 Determined Intent: ${intentData.intent}
 Data found in DB: ${JSON.stringify(rawContext)}
 
@@ -259,7 +275,10 @@ Generate the voice response:`;
 
         return NextResponse.json({
             text: finalSpokenText,
-            intent: intentData.intent
+            intent: intentData.intent,
+            wakeMode,
+            wakeRequired,
+            wakeDetected: wakeParsed.detected,
         });
 
     } catch (err: any) {

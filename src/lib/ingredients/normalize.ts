@@ -46,9 +46,9 @@ function tokensToCandidate(tokens: string[]): string | null {
   const descriptorsAndBrands = new Set([
     'small', 'medium', 'large', 'optional', 'fresh', 'ripe', 'chopped', 'diced', 'sliced', 'thinly', 'grated', 'ground', 'minced', 'crushed', 'to', 'taste', 'soft', 'dinner', 'pieces', 'piece',
     // Common Indian food brand names
-    'everest', 'suhana', 'shan', 'tamarind', 'tata', 'amul', 'aashirvaad', 'registry', 'badshah', 'MDH', 'shan', 'catch', 'eastern', 'spice', 'dabur', 'britannia', 'britannia',
+    'everest', 'suhana', 'shan', 'tamarind', 'tata', 'amul', 'aashirvaad', 'registry', 'badshah', 'mdh', 'catch', 'eastern', 'spice', 'dabur', 'britannia',
     // Other common brand/filler words
-    'organic', 'natural', 'premium', 'pure', 'extract', 'essence', 'powder', 'oil'
+    'organic', 'natural', 'premium', 'pure', 'extract', 'essence'
   ]);
 
   // Filter out descriptors and brand names, keeping only meaningful ingredient tokens
@@ -61,25 +61,25 @@ function tokensToCandidate(tokens: string[]): string | null {
   const meaningfulJoined = toCheck.join(" ");
   if (CANONICAL_INGREDIENTS.includes(meaningfulJoined)) return meaningfulJoined;
 
-  // First, try to find a token that is already a canonical ingredient or has a synonym
+  // Try n-gram phrase matches first so compound ingredients win over single tokens.
+  const maxN = Math.min(4, toCheck.length);
+  for (let n = maxN; n >= 2; n--) {
+    for (let i = 0; i <= toCheck.length - n; i++) {
+      const phrase = toCheck.slice(i, i + n).join(' ');
+      if (CANONICAL_INGREDIENTS.includes(phrase)) return phrase;
+    }
+  }
+
+  // Next, try to find a single token that is already canonical.
   for (const t of toCheck) {
     if (descriptorsAndBrands.has(t)) continue;
     if (CANONICAL_INGREDIENTS.includes(t)) return t;
   }
 
-  // Next, try synonyms mapping (so words like 'chilli' -> 'chili')
+  // Then try token-level synonyms (like chilli -> chili).
   for (const t of toCheck) {
     if (descriptorsAndBrands.has(t)) continue;
-    // Use the imported SYNONYMS mapping (avoid runtime require/circular import)
     if (SYNONYMS && SYNONYMS[t]) return SYNONYMS[t];
-  }
-
-  // Try all two-word combinations of meaningful tokens (for compound ingredients like "pav bhaji")
-  if (toCheck.length >= 2) {
-    for (let i = 0; i < toCheck.length - 1; i++) {
-      const twoWord = `${toCheck[i]} ${toCheck[i + 1]}`;
-      if (CANONICAL_INGREDIENTS.includes(twoWord)) return twoWord;
-    }
   }
 
   // Fallback: return the longest non-descriptor token (likely the most specific)

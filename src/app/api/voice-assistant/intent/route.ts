@@ -5,78 +5,38 @@
  */
 
 import { NextResponse } from 'next/server';
+import { resolveDeterministicIntent } from '@/lib/voice-assistant/deterministic-intent';
+import { parseWakePhrase, shouldRequireWakeWord } from '@/lib/voice-assistant/wake';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
     const { text } = await request.json();
-    const q = String(text || '').trim().toLowerCase();
+    const wakeRequired = shouldRequireWakeWord();
+    const parsed = parseWakePhrase(String(text || ''));
 
-    // Helper: does the query contain any of the phrases
-    const has = (phrases: string[]) => phrases.some((p) => q.includes(p));
-
-    // Expiring this week synonyms
-    const weekPhrases = [
-      'this week',
-      'the week',
-      'upcoming week',
-      'next seven days',
-      'next 7 days',
-      'before the week ends',
-      'go bad this week',
-      'expire this week',
-      'expiring this week',
-      'nearing expiration in the next seven days',
-      'approaching their expiry date this week',
-    ];
-
-    // Cooking today synonyms
-    const cookTodayPhrases = [
-      'cook today',
-      "today's meal",
-      'make today',
-      'today',
-      'right now',
-      'whip up today',
-      'prepare for today',
-      'meal options for today',
-    ];
-
-    // Decide intent deterministically
-    if (
-      has(['expire', 'expiring', 'expiry']) && has(weekPhrases) ||
-      has(['expire this week', 'expiring this week', 'go bad this week'])
-    ) {
-      return NextResponse.json({
-        intent: 'get_expiring_items',
-        parameters: { days: 7, timeframe: 'this_week' },
-        confidence: 1.0,
-      });
+    if (wakeRequired && !parsed.detected) {
+      return NextResponse.json(
+        {
+          error: 'Wake word not detected',
+          message: 'Say Hey Nosh before your command.',
+          wakeDetected: false,
+          wakeRequired,
+        },
+        { status: 428 }
+      );
     }
 
-    if (
-      has(['what can i cook', 'suggest a dish', 'recipe ideas', 'what should i prepare', 'what can i make', 'recipes can i make']) ||
-      has(cookTodayPhrases) ||
-      (has(['recipe', 'recipes']) && has(['make', 'cook', 'prepare']))
-    ) {
-      return NextResponse.json({
-        intent: 'get_makeable_recipes',
-        parameters: { timeframe: 'today' },
-        confidence: 1.0,
-      });
-    }
+    const intent = resolveDeterministicIntent(parsed.query || String(text || ''));
+    const response = {
+      ...intent,
+      wakeDetected: parsed.detected,
+      wakeRequired,
+    };
 
-    // Fallbacks
-    if (has(['inventory', 'what do i have', 'what i have'])) {
-      const resp = { intent: 'get_inventory', parameters: {}, confidence: 0.9 };
-      console.log("HeyNosh Intent Router:", resp);
-      return NextResponse.json(resp);
-    }
-
-    const fallbackResp = { intent: 'smalltalk', parameters: {}, confidence: 0.5 };
-    console.log("HeyNosh Intent Router:", fallbackResp);
-    return NextResponse.json(fallbackResp);
+    console.log('HeyNosh Intent Router:', response);
+    return NextResponse.json(response);
   } catch (err) {
     return NextResponse.json({ error: 'Bad Request' }, { status: 400 });
   }

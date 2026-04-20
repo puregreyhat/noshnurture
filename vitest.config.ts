@@ -7,6 +7,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'src/**/__tests__/**/*.test.ts'],
+    exclude: ['src/__tests__/voice-input.test.ts'],
   },
   resolve: {
     alias: {

@@ -49,8 +49,13 @@ export const SYNONYMS: Record<string, string> = {
 
 // Add a few small locality / item mappings
 export const LOCAL_SYNONYMS: Record<string,string> = {
-  pav: 'bread',
   'pav bhaji': 'pav bhaji masala',
+  'black salt': 'salt',
+  'sea salt': 'salt',
+  'rock salt': 'salt',
+  salted: 'salt',
+  'red chili powder': 'chili powder',
+  'everest chili powder': 'chili powder',
 };
 
 // merge local synonyms into SYNONYMS for runtime use (keeps single export shape)
