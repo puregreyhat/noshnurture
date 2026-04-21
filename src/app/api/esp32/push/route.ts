@@ -3,13 +3,14 @@ import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: Request) {
     try {
-        const { text } = await request.json();
+        const { text, targetDeviceId } = await request.json();
         if (!text) return NextResponse.json({ error: 'No text' }, { status: 400 });
         
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
         
-        if (!user) return NextResponse.json({ error: 'Auth failed' }, { status: 401 });
+        const userId = user?.id || targetDeviceId;
+        if (!userId) return NextResponse.json({ error: 'Auth failed' }, { status: 401 });
 
         // Use service role to bypass Row Level Security rules
         const { createClient: createSupabaseClient } = await import('@supabase/supabase-js');

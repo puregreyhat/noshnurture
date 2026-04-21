@@ -68,6 +68,16 @@ export default function HeyNoshWebSimulator() {
             playAudio(data.text);
             setInput(''); // Clear input
 
+            // Link the simulator payload specifically to the ESP32 UUID so it finds it!
+            fetch('/api/esp32/push', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    text: data.text, 
+                    targetDeviceId: '809a0ac6-c099-4761-a0f2-f7094c3d9075' 
+                })
+            }).catch(e => console.error("Failed to push to esp32:", e));
+
         } catch (err) {
             setAiResponse("Something went wrong! Check your network connection.");
         } finally {
