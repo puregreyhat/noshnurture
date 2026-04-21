@@ -20,7 +20,7 @@ export async function POST(request: Request) {
         );
 
         await supabaseService.from('esp32_queue').insert({
-            user_id: user.id,
+            user_id: userId,
             text: text
         });
 
