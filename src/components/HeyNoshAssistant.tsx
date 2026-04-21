@@ -86,6 +86,17 @@ export default function HeyNoshAssistant() {
     };
   }, []);
 
+  // Broadcast spoken responses to the ESP32 Polling endpoint
+  useEffect(() => {
+    if (response) {
+      fetch('/api/esp32/push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: response })
+      }).catch(err => console.error("Failed to push to ESP32 queue:", err));
+    }
+  }, [response]);
+
   const startListening = () => {
     if (!recognitionRef.current) {
       setError('Speech recognition not supported in this browser. Try Chrome or Edge.');
