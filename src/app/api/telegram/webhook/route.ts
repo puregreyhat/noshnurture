@@ -94,7 +94,7 @@ export async function POST(request: Request) {
                 [
                   {
                     text: '📱 Open in Mobile App',
-                    url: `io.supabase.nosh://telegram-callback?user=${userId}`,
+                    url: `https://noshnurture.vercel.app/api/telegram/redirect?user=${userId}`,
                   },
                 ],
                 [
