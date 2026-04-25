@@ -1,9 +1,9 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../../../../core/models/inventory_item.dart';
 import '../../../../core/models/recipe.dart';
 import '../../../../core/providers/auth_provider.dart';
-import '../../../../core/providers/inventory_provider.dart';
 import '../../../../core/providers/recipe_provider.dart';
 import '../../../../core/widgets/glass.dart';
 import '../../recipes/screens/recipe_detail_screen.dart';
@@ -16,56 +16,277 @@ class DashboardScreen extends StatefulWidget {
   _DashboardScreenState createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
-  int _daysUntilExpiry(DateTime expiryDate) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final expiry = DateTime(expiryDate.year, expiryDate.month, expiryDate.day);
-    return expiry.difference(today).inDays;
+class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late PageController _pageController;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(viewportFraction: 0.88);
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    _animController.forward();
   }
 
-  String _effectiveStatus(InventoryItem item) {
-    final daysUntilExpiry = _daysUntilExpiry(item.expiryDate);
-
-    if (daysUntilExpiry < 0) return 'expired';
-    if (daysUntilExpiry <= 3) return 'expiring';
-
-    final rawStatus = item.status.toLowerCase();
-    if (rawStatus == 'expired') return 'expired';
-    if (rawStatus == 'warning' ||
-        rawStatus == 'caution' ||
-        rawStatus == 'expiring') {
-      return 'expiring';
-    }
-
-    return 'fresh';
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _animController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final inventory = context.watch<InventoryProvider>();
     final recipeProvider = context.watch<RecipeProvider>();
-    final displayName =
-        (auth.userName != null && auth.userName!.trim().isNotEmpty)
+    final displayName = (auth.userName != null && auth.userName!.trim().isNotEmpty)
         ? auth.userName!.trim()
         : ((auth.userEmail != null && auth.userEmail!.contains('@'))
-              ? auth.userEmail!.split('@').first
-              : 'there');
+            ? auth.userEmail!.split('@').first
+            : 'there');
 
     return Scaffold(
       body: GlassBackground(
         child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
+                sliver: SliverToBoxAdapter(
+                  child: _buildAnimatedChild(
+                    index: 0,
+                    child: _WelcomeSection(displayName: displayName),
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: _buildAnimatedChild(
+                  index: 1,
+                  child: _buildRecipeCarousel(context, recipeProvider),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                sliver: SliverToBoxAdapter(
+                  child: _buildAnimatedChild(
+                    index: 2,
+                    child: _buildExploreMoreButton(context),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedChild({required int index, required Widget child}) {
+    final delay = index * 0.2;
+    final animation = CurvedAnimation(
+      parent: _animController,
+      curve: Interval(delay, 1.0, curve: Curves.easeOutCubic),
+    );
+
+    return SlideTransition(
+      position: Tween<Offset>(begin: const Offset(0.0, 0.1), end: Offset.zero).animate(animation),
+      child: FadeTransition(
+        opacity: animation,
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildRecipeCarousel(BuildContext context, RecipeProvider recipeProvider) {
+    final rankedSuggestions = List<Recipe>.from(recipeProvider.recipes)
+      ..sort(recipeProvider.compareRecipesByMatch);
+
+    final suggestions = rankedSuggestions.take(6).toList();
+
+    if (suggestions.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24),
+        child: Text('Add items to your pantry to see magic here!', style: TextStyle(color: Colors.grey)),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          child: _SectionHeader(
+            icon: Icons.auto_awesome_rounded,
+            title: 'Curated for you',
+            subtitle: 'Stunning meals using your ingredients',
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 440,
+          child: PageView.builder(
+            controller: _pageController,
+            onPageChanged: (idx) {
+              setState(() => _currentPage = idx);
+            },
+            physics: const BouncingScrollPhysics(),
+            itemCount: suggestions.length,
+            itemBuilder: (context, index) {
+              final recipe = suggestions[index];
+              return _buildRecipeCardAnimated(context, recipe, index, recipeProvider);
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+        // Page Indicators
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(
+            suggestions.length,
+            (index) => AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              height: 8,
+              width: _currentPage == index ? 24 : 8,
+              decoration: BoxDecoration(
+                color: _currentPage == index ? Colors.orange.shade400 : Colors.orange.shade100,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRecipeCardAnimated(BuildContext context, Recipe recipe, int index, RecipeProvider provider) {
+    return AnimatedBuilder(
+      animation: _pageController,
+      builder: (context, child) {
+        double value = 1.0;
+        if (_pageController.position.haveDimensions) {
+          value = _pageController.page! - index;
+          value = (1 - (value.abs() * 0.15)).clamp(0.0, 1.0);
+        }
+        return Center(
+          child: Transform.scale(
+            scale: Curves.easeOut.transform(value),
+            child: child,
+          ),
+        );
+      },
+      child: GestureDetector(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => RecipeDetailScreen(recipe: recipe)),
+          );
+        },
+        child: Container(
+          width: 320,
+          height: 440,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF1E293B).withOpacity(0.06), // Very soft shadow
+                blurRadius: 24,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Stack(
               children: [
-                _WelcomeSection(displayName: displayName),
-                const SizedBox(height: 20),
-                _buildPantrySnapshot(inventory),
-                const SizedBox(height: 20),
-                _buildRecipeSuggestions(context, recipeProvider),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Top section: Clean unobstructed image
+                    Expanded(
+                      child: Image.network(
+                        recipe.imageUrl,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.center,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFFFAF9F6),
+                          child: const Icon(Icons.restaurant, color: Color(0xFFE2E2E2), size: 64),
+                        ),
+                      ),
+                    ),
+                    // Bottom section: Elegant white card
+                    Container(
+                      color: Colors.white,
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (recipe.tags.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text(
+                                recipe.tags.first.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Color(0xFFD97706), // Warm amber tag
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ),
+                          Text(
+                            recipe.title,
+                            style: const TextStyle(
+                              color: Color(0xFF111827), // Deep charcoal
+                              fontWeight: FontWeight.w800,
+                              fontSize: 22,
+                              height: 1.2,
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 16),
+                          // Stats Row
+                          Row(
+                            children: [
+                              Icon(Icons.timer_outlined, color: Colors.grey.shade400, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${recipe.prepTimeMins}m',
+                                style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
+                              const SizedBox(width: 16),
+                              Icon(Icons.local_fire_department_outlined, color: Colors.grey.shade400, size: 16),
+                              const SizedBox(width: 4),
+                              Text(
+                                recipe.difficulty,
+                                style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
+                              const Spacer(),
+                              // Elegant Bookmark
+                              GestureDetector(
+                                onTap: () => provider.toggleBookmark(recipe.id),
+                                child: Icon(
+                                  recipe.isBookmarked ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
+                                  color: recipe.isBookmarked ? const Color(0xFFD97706) : Colors.grey.shade400,
+                                  size: 26,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -74,253 +295,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _buildPantrySnapshot(InventoryProvider inventory) {
-    final recentItems = inventory.items.take(3).toList();
-    if (recentItems.isEmpty) return const SizedBox.shrink();
-
-    return GlassCard(
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeader(
-            icon: Icons.shopping_basket,
-            title: 'Pantry Snapshot',
-          ),
-          const SizedBox(height: 10),
-          ...recentItems.map((item) {
-            final effectiveStatus = _effectiveStatus(item);
-            final statusColor = effectiveStatus == 'expired'
-                ? const Color(0xFFB91C1C)
-                : (effectiveStatus == 'expiring'
-                      ? const Color(0xFFB45309)
-                      : const Color(0xFF15803D));
-            final statusBg = effectiveStatus == 'expired'
-                ? Colors.red.shade50
-                : (effectiveStatus == 'expiring'
-                      ? Colors.orange.shade50
-                      : Colors.green.shade50);
-            return Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          '${item.quantity} ${item.unit}',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusBg,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      effectiveStatus.toUpperCase(),
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRecipeSuggestions(
-    BuildContext context,
-    RecipeProvider recipeProvider,
-  ) {
-    final rankedSuggestions = List<Recipe>.from(recipeProvider.recipes)
-      ..sort(recipeProvider.compareRecipesByMatch);
-
-    final suggestions = rankedSuggestions.take(3).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const _SectionHeader(
-              icon: Icons.restaurant_menu,
-              title: 'Recipe Suggestions',
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RecipesScreen()),
-                );
-              },
-              child: const Text(
-                'View All',
-                style: TextStyle(
-                  color: Colors.green,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 17,
-                ),
-              ),
-            ),
-          ],
+  Widget _buildExploreMoreButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const RecipesScreen()));
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade300, width: 1),
         ),
-        const SizedBox(height: 10),
-        if (suggestions.isEmpty)
-          const Text('No recipes found', style: TextStyle(color: Colors.grey))
-        else
-          Column(
-            children: suggestions.map((recipe) {
-              final foundCount = recipeProvider.foundIngredientCount(recipe);
-              final totalCount = recipeProvider.totalIngredientCount(recipe);
-
-              return GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => RecipeDetailScreen(recipe: recipe),
-                    ),
-                  );
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  child: GlassCard(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Row(
-                      children: [
-                        ClipRRect(
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(14),
-                            bottomLeft: Radius.circular(14),
-                          ),
-                          child: Image.network(
-                            recipe.imageUrl,
-                            width: 118,
-                            height: 96,
-                            fit: BoxFit.cover,
-                            alignment: Alignment.center,
-                            errorBuilder: (_, __, ___) => Container(
-                              width: 118,
-                              height: 96,
-                              color: Colors.green.shade50,
-                              alignment: Alignment.center,
-                              child: Icon(
-                                Icons.restaurant,
-                                color: Colors.green.shade700,
-                                size: 26,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  recipe.title,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 17,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${recipe.prepTimeMins} mins • ${recipe.difficulty}',
-                                  style: const TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.shade50,
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    '$foundCount/$totalCount ingredients',
-                                    style: TextStyle(
-                                      color: Colors.green.shade700,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                if (recipe.tags.isNotEmpty)
-                                  Text(
-                                    recipe.tags.first,
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: Icon(
-                            recipe.isBookmarked
-                                ? Icons.bookmark
-                                : Icons.bookmark_border,
-                            color: Colors.green,
-                          ),
-                          onPressed: () =>
-                              recipeProvider.toggleBookmark(recipe.id),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
+        child: const Center(
+          child: Text(
+            'Explore All Recipes',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF374151), // Sleek grey
+              letterSpacing: -0.3,
+            ),
           ),
-      ],
+        ),
+      ),
     );
   }
 }
@@ -332,47 +331,49 @@ class _WelcomeSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final greetingName = displayName.isNotEmpty ? displayName : 'there';
+    final greetingName = displayName.isNotEmpty ? displayName : 'beautiful';
+    
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Hello, $greetingName',
+                'Good morning, $greetingName.',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
-                  color: Color(0xFF6B7280),
-                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 6),
               const Text(
-                'Welcome back 👋',
+                'Let\'s create magic ✨',
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF111827),
-                  height: 1.1,
+                  color: Color(0xFF1F2937),
+                  letterSpacing: -0.5,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 16),
         CircleAvatar(
-          radius: 22,
-          backgroundColor: const Color(0xFF16A34A),
+          radius: 24,
+          backgroundColor: const Color(0xFFE2E8F0),
           child: Text(
             greetingName[0].toUpperCase(),
             style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
+              color: Color(0xFF475569),
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
             ),
           ),
         ),
@@ -384,18 +385,48 @@ class _WelcomeSection extends StatelessWidget {
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
   final String title;
+  final String subtitle;
 
-  const _SectionHeader({required this.icon, required this.title});
+  const _SectionHeader({required this.icon, required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 20, color: Colors.green),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9), // clean off-grey
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 20, color: const Color(0xFF475569)),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 20, 
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+                color: Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Padding(
+          padding: const EdgeInsets.only(left: 4),
+          child: Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );

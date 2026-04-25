@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../network/api_client.dart';
+import '../providers/inventory_provider.dart';
+import '../utils/voice_parser.dart';
 
 class HeyNoshProvider extends ChangeNotifier {
   final ApiClient _apiClient = ApiClient();
@@ -14,7 +16,7 @@ class HeyNoshProvider extends ChangeNotifier {
   String get aiResponse => _aiResponse;
   String? get error => _error;
 
-  Future<void> submitQuery(String query) async {
+  Future<void> submitQuery(String query, InventoryProvider inventoryProvider) async {
     if (query.trim().isEmpty) return;
 
     _isLoading = true;
@@ -23,7 +25,37 @@ class HeyNoshProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // TODO: Replace with real API call to /api/heynosh
+      // 1. Intercept CRUD Intents locally
+      final lowerQ = query.toLowerCase();
+      if (lowerQ.startsWith('add') || 
+          lowerQ.startsWith('buy') || 
+          lowerQ.startsWith('i bought') ||
+          lowerQ.startsWith('we need') ||
+          lowerQ.startsWith('get')) {
+        
+        final detectedItems = VoiceParser.parse(query);
+        
+        if (detectedItems.isNotEmpty) {
+          int count = 0;
+          for (final item in detectedItems) {
+            await inventoryProvider.addItem(item);
+            count++;
+          }
+          
+          _isLoading = false;
+          final plural = count > 1 ? 's' : '';
+          _aiResponse = "I have successfully added $count item$plural to your inventory list!";
+          _isSpeaking = true;
+          notifyListeners();
+
+          await Future.delayed(const Duration(seconds: 4));
+          _isSpeaking = false;
+          notifyListeners();
+          return;
+        }
+      }
+
+      // 2. Simulated/Real API Fallback for complex queries
       await Future.delayed(const Duration(seconds: 2));
 
       _isLoading = false;

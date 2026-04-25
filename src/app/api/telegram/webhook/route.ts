@@ -93,8 +93,14 @@ export async function POST(request: Request) {
               inline_keyboard: [
                 [
                   {
-                    text: '✅ Verify & Open Settings',
-                    url: `https://noshnurture.vercel.app/telegram/success?user=${userId}`,
+                    text: '📱 Open in Mobile App',
+                    url: `io.supabase.nosh://telegram-callback?user=${userId}`,
+                  },
+                ],
+                [
+                  {
+                    text: '🌐 Open in Web Settings',
+                    url: `https://noshnurture.vercel.app/settings?telegram=connected&user=${userId}`,
                   },
                 ],
               ],
@@ -114,8 +120,18 @@ export async function POST(request: Request) {
         // No user_id in link - send instructions
         await sendTelegramMessage({
           chat_id: chatId,
-          text: `👋 Welcome to *NoshNurture Bot*!\n\nTo connect your account:\n1. Go to noshnurture.vercel.app\n2. Open Settings\n3. Click "Connect Telegram"\n4. You'll be redirected here automatically!\n\nOr send me your Chat ID: \`${chatId}\``,
+          text: `🍲 *Welcome to NoshNurture!* 👋\n\nTo connect your account and start receiving expiry alerts:\n\n1️⃣ Open the **NoshNurture** app or website\n2️⃣ Go to **Settings**\n3️⃣ Toggle **Telegram** and click **Connect**\n\nOnce connected, I'll send you daily reminders for items expiring soon! 🥗`,
           parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: '🌐 Open Website',
+                  url: 'https://noshnurture.vercel.app/settings',
+                },
+              ],
+            ],
+          },
         });
       }
 

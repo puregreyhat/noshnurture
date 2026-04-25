@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/inventory_item.dart';
 import '../../../core/providers/inventory_provider.dart';
+import '../../../core/utils/expiry_helper.dart';
 
 class ManualEntryScreen extends StatefulWidget {
   const ManualEntryScreen({super.key});
@@ -62,7 +63,7 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                 decoration: const InputDecoration(labelText: 'Quantity'),
                 keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               Row(
                 children: [
                   const Text('Expiry: '),
@@ -79,6 +80,23 @@ class _ManualEntryScreenState extends State<ManualEntryScreen> {
                       if (d != null) setState(() => _expiry = d);
                     },
                     child: Text('${_expiry.toLocal()}'.split(' ')[0]),
+                  ),
+                  const Spacer(),
+                  Tooltip(
+                    message: "Auto-predict expiry from name",
+                    child: IconButton(
+                      icon: const Icon(Icons.auto_awesome, color: Colors.amber),
+                      onPressed: () {
+                        if (_nameCtrl.text.trim().isNotEmpty) {
+                          setState(() {
+                            _expiry = ExpiryHelper.getSmartExpiry(_nameCtrl.text.trim());
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                           const SnackBar(content: Text('Expiry date auto-predicted!'), duration: Duration(seconds: 2))
+                          );
+                        }
+                      },
+                    ),
                   ),
                 ],
               ),

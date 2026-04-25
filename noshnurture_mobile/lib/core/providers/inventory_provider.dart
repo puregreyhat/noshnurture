@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/inventory_item.dart';
+import '../services/notification_service.dart';
 
 class InventoryProvider extends ChangeNotifier {
   List<InventoryItem> _items = [];
@@ -131,12 +132,18 @@ class InventoryProvider extends ChangeNotifier {
         },
         body: json.encode({
           'user_id': userId,
+          'order_id': 'mob_${DateTime.now().millisecondsSinceEpoch}',
+          'order_date': DateTime.now().toIso8601String(),
           'product_name': item.name,
+          'category': 'Uncategorized',
           'quantity': item.quantity,
           'unit': item.unit,
           'expiry_date': item.expiryDate.toIso8601String(),
+          'days_until_expiry': item.expiryDate.difference(DateTime.now()).inDays,
           'status': item.status,
           'storage_type': item.storageType,
+          'tags': [],
+          'common_uses': [],
           'is_consumed': false,
         }),
       );
@@ -171,6 +178,7 @@ class InventoryProvider extends ChangeNotifier {
           'quantity': item.quantity,
           'unit': item.unit,
           'expiry_date': item.expiryDate.toIso8601String(),
+          'days_until_expiry': item.expiryDate.difference(DateTime.now()).inDays,
           'status': item.status,
           'storage_type': item.storageType,
         }),

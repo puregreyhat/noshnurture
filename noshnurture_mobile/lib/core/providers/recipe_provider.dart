@@ -10,6 +10,8 @@ class RecipeProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   List<String> _userIngredients = [];
+  List<String> _userIngredientsCanonical = [];
+  List<Set<String>> _userIngredientsTokens = [];
 
   List<Recipe> get recipes => _recipes;
   List<Recipe> get bookmarkedRecipes =>
@@ -113,6 +115,9 @@ class RecipeProvider extends ChangeNotifier {
     }
 
     _userIngredients = newIngredients;
+    _userIngredientsCanonical = _userIngredients.map((i) => _canonicalizeIngredient(i)).toList();
+    _userIngredientsTokens = _userIngredients.map((i) => _normalizeIngredientTokens(i)).toList();
+    
     if (_recipes.isNotEmpty) {
       _sortRecipesByContext();
       notifyListeners();
@@ -200,12 +205,12 @@ class RecipeProvider extends ChangeNotifier {
     final canonicalRecipe = _canonicalizeIngredient(ingName);
     final recipeTokens = _normalizeIngredientTokens(ingName);
 
-    for (var invName in _userIngredients) {
-      final inv = invName.toLowerCase().trim();
+    for (int i = 0; i < _userIngredients.length; i++) {
+      final inv = _userIngredients[i];
       if (inv.isEmpty) continue;
 
-      final canonicalInv = _canonicalizeIngredient(inv);
-      final inventoryTokens = _normalizeIngredientTokens(inv);
+      final canonicalInv = _userIngredientsCanonical[i];
+      final inventoryTokens = _userIngredientsTokens[i];
 
       if (inv == ingName) return true;
       if (canonicalInv == canonicalRecipe) return true;

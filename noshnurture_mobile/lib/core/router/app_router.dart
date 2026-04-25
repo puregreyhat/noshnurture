@@ -5,7 +5,7 @@ import '../../features/auth/screens/register_screen.dart';
 import '../../features/survey/screens/survey_screen.dart';
 import '../../features/admin/screens/admin_screen.dart';
 import '../../features/scanner/screens/scanner_screen.dart';
-import '../../main.dart';
+import '../../main.dart'; // Ensure it can access the wrapper layout in main
 import '../providers/auth_provider.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
@@ -45,7 +45,7 @@ class AppRouter {
         ),
         GoRoute(
           path: '/',
-          builder: (context, state) => const VoiceBridgeScreen(),
+          builder: (context, state) => const MainLayoutScreen(),
         ),
         GoRoute(
           path: '/survey',
@@ -58,6 +58,16 @@ class AppRouter {
         GoRoute(
           path: '/scanner',
           builder: (context, state) => const ScannerScreen(),
+        ),
+        GoRoute(
+          path: '/telegram-callback',
+          builder: (context, state) {
+            // Force refresh preferences when returning from Telegram
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              authProvider.fetchUserPreferences();
+            });
+            return const MainLayoutScreen();
+          },
         ),
       ],
     );

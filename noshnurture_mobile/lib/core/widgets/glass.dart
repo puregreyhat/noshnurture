@@ -12,36 +12,24 @@ class GlassBackground extends StatelessWidget {
     return Stack(
       children: [
         Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFFF8FFF7), Color(0xFFEFFAF3), Color(0xFFF9F6EA)],
-            ),
+          color: const Color(0xFFFDFBF7), // Warm creamy off-white
+        ),
+        // Just one massive, extremely soft warm glow in the top right
+        Positioned(
+          top: -150,
+          right: -100,
+          child: _blurOrb(
+            color: const Color(0xFFFDE6D5).withOpacity(0.5), // Soft peach glow
+            size: 400,
           ),
         ),
+        // And one at the bottom left
         Positioned(
-          top: -90,
-          right: -70,
+          bottom: -100,
+          left: -150,
           child: _blurOrb(
-            color: const Color(0xFF34D399).withOpacity(0.22),
-            size: 240,
-          ),
-        ),
-        Positioned(
-          bottom: -120,
-          left: -60,
-          child: _blurOrb(
-            color: const Color(0xFF7DD3FC).withOpacity(0.2),
-            size: 280,
-          ),
-        ),
-        Positioned(
-          top: 220,
-          left: 120,
-          child: _blurOrb(
-            color: const Color(0xFFFBBF24).withOpacity(0.12),
-            size: 170,
+            color: const Color(0xFFF3ECE4).withOpacity(0.6), // Very subtle warm grey/sand
+            size: 500,
           ),
         ),
         child,
@@ -51,12 +39,18 @@ class GlassBackground extends StatelessWidget {
 
   Widget _blurOrb({required Color color, required double size}) {
     return IgnorePointer(
-      child: ImageFiltered(
-        imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              color.withOpacity(color.opacity * 0.8),
+              color.withOpacity(0.0)
+            ],
+            stops: const [0.3, 1.0],
+          ),
         ),
       ),
     );
@@ -86,14 +80,14 @@ class GlassCard extends StatelessWidget {
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: tint ?? Colors.white.withOpacity(0.58),
+            color: tint ?? Colors.white.withOpacity(0.4),
             borderRadius: borderRadius,
-            border: Border.all(color: Colors.white.withOpacity(0.55), width: 1),
+            border: Border.all(color: Colors.white.withOpacity(0.6), width: 1.2),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF0F172A).withOpacity(0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
+                color: const Color(0xFFE2725B).withOpacity(0.06),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
               ),
             ],
           ),

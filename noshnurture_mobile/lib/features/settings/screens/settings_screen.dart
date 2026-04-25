@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/providers/inventory_provider.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../core/widgets/glass.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,397 +18,464 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _enableEmail = true;
   bool _enableTelegram = false;
-  bool _enablePush = false;
-  final String _notificationTime = '07:00 AM';
+  bool _enablePush = true;
+  bool _dailyReminder = true;
+  TimeOfDay _notificationTime = const TimeOfDay(hour: 8, minute: 0);
+  bool _isSaving = false;
+  int _reminderTapCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().fetchUserPreferences();
+    });
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _enableEmail = prefs.getBool('notif_email') ?? true;
+      _enableTelegram = prefs.getBool('notif_telegram') ?? false;
+      _enablePush = prefs.getBool('notif_push') ?? true;
+      _dailyReminder = prefs.getBool('daily_reminder') ?? true;
+      final hour = prefs.getInt('notif_hour') ?? 8;
+      final minute = prefs.getInt('notif_minute') ?? 0;
+      _notificationTime = TimeOfDay(hour: hour, minute: minute);
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    setState(() => _isSaving = true);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('notif_email', _enableEmail);
+    await prefs.setBool('notif_telegram', _enableTelegram);
+    await prefs.setBool('notif_push', _enablePush);
+    await prefs.setBool('daily_reminder', _dailyReminder);
+    await prefs.setInt('notif_hour', _notificationTime.hour);
+    await prefs.setInt('notif_minute', _notificationTime.minute);
+    
+    if (_dailyReminder && _enablePush) {
+      final inventory = context.read<InventoryProvider>();
+      await NotificationService().scheduleDailyExpiryNotification(
+        time: _notificationTime,
+        items: inventory.items,
+      );
+    }
+
+    // Sync with Supabase
+    try {
+      final auth = context.read<AuthProvider>();
+      if (auth.userId != null) {
+        await Supabase.instance.client.from('user_preferences').upsert({
+          'user_id': auth.userId,
+          'enable_email': _enableEmail,
+          'enable_telegram': _enableTelegram,
+          'enable_push': _enablePush,
+          'reminder_time': '${_notificationTime.hour.toString().padLeft(2, '0')}:${_notificationTime.minute.toString().padLeft(2, '0')}',
+        });
+      }
+    } catch (e) {
+      debugPrint('Error syncing preferences to Supabase: $e');
+    }
+    
+    if (mounted) {
+      setState(() => _isSaving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Settings saved successfully'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  String _formatTimeOfDay(TimeOfDay time) {
+    final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
+    final minute = time.minute.toString().padLeft(2, '0');
+    final period = time.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$hour:$minute $period';
+  }
+
+  Future<void> _selectTime(BuildContext context) async {
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: _notificationTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.green.shade700,
+              onPrimary: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != _notificationTime) {
+      setState(() {
+        _notificationTime = picked;
+      });
+      _saveSettings();
+    }
+  }
+
+  void _handleReminderEasterEgg() {
+    _reminderTapCount++;
+    if (_reminderTapCount >= 5) {
+      _reminderTapCount = 0;
+      NotificationService().showTestNotification();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('🎉 Easter Egg! Test notification sent.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _connectTelegram() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.userId == null) return;
+    
+    const botUsername = 'noshnurture_bot'; 
+    
+    // Try direct app link first
+    final appUrl = Uri.parse('tg://resolve?domain=$botUsername&start=${auth.userId}');
+    // Fallback to browser link
+    final webUrl = Uri.parse('https://t.me/$botUsername?start=${auth.userId}');
+    
+    try {
+      if (await canLaunchUrl(appUrl)) {
+        await launchUrl(appUrl, mode: LaunchMode.externalNonBrowserApplication);
+      } else if (await canLaunchUrl(webUrl)) {
+        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Could not launch any Telegram link';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e. Make sure Telegram is installed.')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final displayName =
         (auth.userName != null && auth.userName!.trim().isNotEmpty)
-        ? auth.userName!.trim()
-        : ((auth.userEmail != null && auth.userEmail!.contains('@'))
-              ? auth.userEmail!.split('@').first
-              : 'User');
+            ? auth.userName!.trim()
+            : 'User';
     final displayEmail =
         (auth.userEmail != null && auth.userEmail!.trim().isNotEmpty)
-        ? auth.userEmail!.trim()
-        : 'No email';
+            ? auth.userEmail!.trim()
+            : 'No email';
     final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.green.shade900,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.settings, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Settings',
-              style: TextStyle(
-                color: Colors.black87,
-                fontWeight: FontWeight.bold,
-                fontSize: 24,
-                fontFamily: 'serif',
-              ),
-            ),
-          ],
-        ),
-      ),
-      body: GlassBackground(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildProfileCard(
-                  displayName: displayName,
-                  displayEmail: displayEmail,
-                  initial: initial,
-                ),
-                const SizedBox(height: 24),
-                _buildSignOutButton(),
-                const SizedBox(height: 32),
-                _buildNotificationsSection(),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProfileCard({
-    required String displayName,
-    required String displayEmail,
-    required String initial,
-  }) {
-    return GlassCard(
-      padding: const EdgeInsets.all(24),
-      borderRadius: BorderRadius.circular(24),
-      tint: Colors.green.shade50.withOpacity(0.5),
-      child: Column(
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.green.shade600,
-              border: Border.all(color: Colors.white, width: 4),
-            ),
-            child: Center(
-              child: Text(
-                initial,
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  fontFamily: 'serif',
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            displayName,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              fontFamily: 'serif',
-            ),
-          ),
-          Text(displayEmail, style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 16),
-          _buildActionLink(
-            icon: Icons.edit_note,
-            title: 'Help Improve NoshNurture',
-            color: Colors.orange,
-          ),
-          const SizedBox(height: 12),
-          _buildActionLink(
-            icon: Icons.bolt,
-            title: 'QA Panel',
-            color: Colors.teal,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionLink({
-    required IconData icon,
-    required String title,
-    required MaterialColor color,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        color: color.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.shade200),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: color.shade700, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: color.shade700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSignOutButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () async {
-          await context.read<AuthProvider>().logout();
-        },
-        icon: const Icon(Icons.logout, color: Colors.white),
-        label: const Text(
-          'Sign Out',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.grey.shade900,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNotificationsSection() {
-    return GlassCard(
-      padding: const EdgeInsets.all(24),
-      borderRadius: BorderRadius.circular(24),
-      tint: Colors.blue.shade50.withOpacity(0.4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
+      backgroundColor: Colors.grey.shade50,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 200.0,
+            floating: false,
+            pinned: true,
+            backgroundColor: Colors.green.shade800,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
                 decoration: BoxDecoration(
-                  color: Colors.teal,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.notifications, color: Colors.white),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Notifications',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'serif',
-                      ),
-                    ),
-                    Text(
-                      'Choose how you want to be notified',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.warning_amber_rounded, size: 16),
-                label: const Text('Test Alert'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.green.shade800, Colors.green.shade600],
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Time Picker Mock
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.access_time,
-                      color: Colors.grey.shade400,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'DAILY REMINDER TIME',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: Text(
-                          _notificationTime,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    const Expanded(
+                    const SizedBox(height: 40),
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.white24,
                       child: Text(
-                        'We will check your pantry and send alerts at this time.',
-                        style: TextStyle(fontSize: 10, color: Colors.grey),
+                        initial,
+                        style: const TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    Text(
+                      displayEmail,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white.withOpacity(0.8),
                       ),
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Toggles
-          _buildToggleItem(
-            icon: Icons.mail,
-            title: 'Email Notifications',
-            subtitle: 'Daily reminders via email',
-            value: _enableEmail,
-            onChanged: (val) => setState(() => _enableEmail = val),
-          ),
-          const SizedBox(height: 12),
-          _buildToggleItem(
-            icon: Icons.send,
-            title: 'Telegram Notifications',
-            subtitle: _enableTelegram ? 'Connected' : 'Not connected',
-            value: _enableTelegram,
-            onChanged: (val) => setState(() => _enableTelegram = val),
-          ),
-          const SizedBox(height: 12),
-          _buildToggleItem(
-            icon: Icons.phone_android,
-            title: 'Push Notifications',
-            subtitle: 'Alerts on this device',
-            value: _enablePush,
-            onChanged: (val) => setState(() => _enablePush = val),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle('Notifications'),
+                  const SizedBox(height: 12),
+                  _buildSettingCard(
+                    child: Column(
+                      children: [
+                        _buildToggleTile(
+                          icon: Icons.notifications_active_outlined,
+                          title: 'Daily Expiry Reminder',
+                          subtitle: 'Alerts for items expiring in 1-2 days',
+                          value: _dailyReminder,
+                          onChanged: (val) {
+                            setState(() => _dailyReminder = val);
+                            _saveSettings();
+                            _handleReminderEasterEgg();
+                          },
+                        ),
+                        if (_dailyReminder) ...[
+                          const Divider(indent: 56),
+                          _buildClickableTile(
+                            icon: Icons.access_time,
+                            title: 'Reminder Time',
+                            trailing: Text(
+                              _formatTimeOfDay(_notificationTime),
+                              style: TextStyle(
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            onTap: () => _selectTime(context),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('Notification Channels'),
+                  const SizedBox(height: 12),
+                  _buildSettingCard(
+                    child: Column(
+                      children: [
+                        _buildToggleTile(
+                          icon: Icons.mail_outline,
+                          title: 'Email',
+                          value: _enableEmail,
+                          onChanged: (val) {
+                            setState(() => _enableEmail = val);
+                            _saveSettings();
+                          },
+                        ),
+                        const Divider(indent: 56),
+                        _buildToggleTile(
+                          icon: Icons.telegram_outlined,
+                          title: 'Telegram',
+                          value: _enableTelegram,
+                          onChanged: (val) {
+                            setState(() => _enableTelegram = val);
+                            _saveSettings();
+                          },
+                        ),
+                        if (_enableTelegram && auth.telegramChatId == null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: ElevatedButton.icon(
+                              onPressed: _connectTelegram,
+                              icon: const Icon(Icons.link),
+                              label: const Text('Connect Telegram Bot'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue.shade600,
+                                foregroundColor: Colors.white,
+                                minimumSize: const Size(double.infinity, 45),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                        const Divider(indent: 56),
+                        _buildToggleTile(
+                          icon: Icons.phone_iphone_outlined,
+                          title: 'Push Notifications',
+                          value: _enablePush,
+                          onChanged: (val) {
+                            setState(() => _enablePush = val);
+                            _saveSettings();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('Account'),
+                  const SizedBox(height: 12),
+                  _buildSettingCard(
+                    child: Column(
+                      children: [
+                        _buildClickableTile(
+                          icon: Icons.person_outline,
+                          title: 'Edit Profile',
+                          onTap: () {},
+                        ),
+                        const Divider(indent: 56),
+                        _buildClickableTile(
+                          icon: Icons.lock_outline,
+                          title: 'Security',
+                          onTap: () {},
+                        ),
+                        const Divider(indent: 56),
+                        _buildClickableTile(
+                          icon: Icons.logout,
+                          title: 'Sign Out',
+                          titleColor: Colors.red.shade700,
+                          onTap: () => auth.logout(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('More'),
+                  const SizedBox(height: 12),
+                  _buildSettingCard(
+                    child: Column(
+                      children: [
+                        _buildClickableTile(
+                          icon: Icons.help_outline,
+                          title: 'Help & Feedback',
+                          onTap: () {},
+                        ),
+                        const Divider(indent: 56),
+                        _buildClickableTile(
+                          icon: Icons.info_outline,
+                          title: 'About NoshNurture',
+                          onTap: () {},
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildToggleItem({
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey.shade600,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingCard({required Widget child}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildToggleTile({
     required IconData icon,
     required String title,
-    required String subtitle,
+    String? subtitle,
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: Colors.green.shade700, size: 22),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: Colors.grey.shade400),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: TextStyle(
-                    color: value ? Colors.green : Colors.grey,
-                    fontSize: 12,
-                    fontWeight: value ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: Colors.white,
-            activeTrackColor: Colors.green,
-            inactiveThumbColor: Colors.white,
-            inactiveTrackColor: Colors.grey.shade300,
-          ),
-        ],
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
       ),
+      subtitle: subtitle != null ? Text(subtitle, style: const TextStyle(fontSize: 12)) : null,
+      trailing: Switch.adaptive(
+        value: value,
+        onChanged: onChanged,
+        activeColor: Colors.green.shade700,
+      ),
+    );
+  }
+
+  Widget _buildClickableTile({
+    required IconData icon,
+    required String title,
+    Widget? trailing,
+    required VoidCallback onTap,
+    Color? titleColor,
+  }) {
+    return ListTile(
+      onTap: onTap,
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: (titleColor ?? Colors.green.shade700).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: titleColor ?? Colors.green.shade700, size: 22),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 16,
+          color: titleColor ?? Colors.black87,
+        ),
+      ),
+      trailing: trailing ?? const Icon(Icons.chevron_right, color: Colors.grey),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 import '../../../core/models/inventory_item.dart';
 import '../../../core/providers/inventory_provider.dart';
+import '../../../core/utils/expiry_helper.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -152,7 +153,7 @@ class _BarcodeScannerScreenState extends State<BarcodeScannerScreen> {
                         name: name.toString(),
                         quantity: 1,
                         unit: 'pcs',
-                        expiryDate: DateTime.now().add(const Duration(days: 7)),
+                        expiryDate: ExpiryHelper.getSmartExpiry(name.toString()),
                         storageType: 'pantry',
                         status: 'fresh',
                       );

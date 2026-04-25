@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:provider/provider.dart';
 import '../../../core/providers/inventory_provider.dart';
 import '../../../core/models/inventory_item.dart';
+import '../../../core/services/gemini_vision_service.dart';
+import '../../../core/utils/expiry_helper.dart';
 
 class CameraAiScreen extends StatefulWidget {
   const CameraAiScreen({super.key});
@@ -19,6 +22,8 @@ class _CameraAiScreenState extends State<CameraAiScreen> {
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _expiryController = TextEditingController();
+  String? _freshnessNotes;
+  bool _isProduce = false;
 
   @override
   void dispose() {
@@ -29,62 +34,54 @@ class _CameraAiScreenState extends State<CameraAiScreen> {
 
   Future<void> _captureFront() async {
     setState(() => _processing = true);
-    final XFile? file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 80);
+    final XFile? file = await _picker.pickImage(source: ImageSource.camera, imageQuality: 40);
     if (file == null) {
       setState(() => _processing = false);
       return;
     }
 
-    final inputImage = InputImage.fromFilePath(file.path);
-    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-    
     try {
+      // 1. Run Local OCR first (extremely fast and accurate for labels)
+      final inputImage = InputImage.fromFilePath(file.path);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
       final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
-      String bestName = '';
-      if (recognizedText.blocks.isNotEmpty) {
-        // Sort blocks by bounding box area descending to find the most prominent text
-        final blocks = recognizedText.blocks.toList();
-        blocks.sort((a, b) {
-          final areaA = a.boundingBox.width * a.boundingBox.height;
-          final areaB = b.boundingBox.width * b.boundingBox.height;
-          return areaB.compareTo(areaA);
-        });
-        
-        // Take the top 3 largest blocks
-        final topBlocks = blocks.take(3).toList();
-        
-        // Find the top-most block in the original blocks list (usually brand)
-        final sortedByY = List<TextBlock>.from(blocks)
-          ..sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
-        final topMostBlock = sortedByY.isNotEmpty ? sortedByY.first : null;
-
-        // Combine top blocks + top most block uniquely
-        final selectedSet = <TextBlock>{...topBlocks};
-        if (topMostBlock != null) {
-          selectedSet.add(topMostBlock);
-        }
-        final selectedBlocks = selectedSet.toList();
-
-        // Sort those selected blocks vertically (by their Y coordinate) to maintain reading order
-        // If they are roughly on the same horizontal line, sort left-to-right
-        selectedBlocks.sort((a, b) {
-          final yDiff = a.boundingBox.top - b.boundingBox.top;
-          if (yDiff.abs() < 40) { 
-            return a.boundingBox.left.compareTo(b.boundingBox.left);
-          }
-          return yDiff.compareTo(0);
-        });
-        
-        bestName = selectedBlocks.map((b) => b.text.replaceAll('\n', ' ').trim()).join(' ');
-        
-        // Fix common OCR anomalies like "IDARK" or consecutive spaces
-        bestName = bestName.replaceAll('IDARK', 'DARK').replaceAll(RegExp(r'\s+'), ' ').trim();
-      }
-      _nameController.text = bestName;
-    } catch (e) {
-      debugPrint('Text extraction failed: $e');
-    } finally {
+      final String rawText = recognizedText.text.trim();
       textRecognizer.close();
+
+      debugPrint('[CameraAI] OCR Extracted Text: ${rawText.replaceAll('\n', ' ')}');
+
+      GeminiVisionResult? result;
+
+      if (rawText.length > 10) {
+        // Use the text-based analysis (saves data, higher accuracy)
+        result = await GeminiVisionService.analyzeProductFromText(rawText);
+      }
+
+      // 2. If text analysis failed or was too short, try Image Analysis
+      if (result == null || result.productName == 'Unknown Product') {
+        debugPrint('[CameraAI] Text analysis insufficient, falling back to Image Vision...');
+        final bytes = await file.readAsBytes();
+        result = await GeminiVisionService.analyzeImage(base64Encode(bytes));
+      }
+
+      if (result != null) {
+        debugPrint('[CameraAI] Success! Identified: "${result.productName}"');
+        _nameController.text = result.productName;
+        _isProduce = result.isProduce;
+        _freshnessNotes = result.freshnessNotes;
+        
+        if (result.expiryDate != null) {
+          _expiryController.text = result.expiryDate!;
+        }
+        
+        setState(() {
+          _processing = false;
+          _step = (result!.isProduce || result!.expiryDate != null) ? 3 : 2; 
+        });
+        return;
+      }
+    } catch (e) {
+      debugPrint('[CameraAI] Processing failed: $e');
     }
 
     setState(() {
@@ -187,14 +184,15 @@ class _CameraAiScreenState extends State<CameraAiScreen> {
   void _addItem() async {
     final provider = context.read<InventoryProvider>();
     final parsedExpiry = _parseDate(_expiryController.text);
+    final String finalName = _nameController.text.isNotEmpty ? _nameController.text : 'Scanned Product';
     
     final item = InventoryItem(
       id: DateTime.now().toIso8601String(),
-      name: _nameController.text.isNotEmpty ? _nameController.text : 'Scanned Product',
+      name: finalName,
       quantity: 1,
       unit: 'pcs',
-      expiryDate: parsedExpiry ?? DateTime.now().add(const Duration(days: 7)),
-      storageType: 'pantry',
+      expiryDate: parsedExpiry ?? ExpiryHelper.getSmartExpiry(finalName),
+      storageType: _isProduce ? 'fridge' : 'pantry',
       status: 'fresh',
     );
     await provider.addItem(item);
@@ -251,7 +249,7 @@ class _CameraAiScreenState extends State<CameraAiScreen> {
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, fontFamily: 'serif')),
         const SizedBox(height: 16),
         const Text(
-          'Capture the front label so we can identify the product name and brand.',
+          'Capture the front label or the fresh produce (like vegetables) so we can identify it via AI.',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.black87, fontSize: 16),
         ),
@@ -317,6 +315,34 @@ class _CameraAiScreenState extends State<CameraAiScreen> {
             fillColor: Colors.white,
           ),
         ),
+        if (_freshnessNotes != null) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.green.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.eco, color: Colors.green.shade700),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('AI Freshness Analysis', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green.shade900)),
+                      const SizedBox(height: 4),
+                      Text(_freshnessNotes!, style: TextStyle(color: Colors.green.shade800)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         const Text(
           'Edit any incorrect text before adding to your inventory.',
@@ -397,6 +423,8 @@ class _CameraAiScreenState extends State<CameraAiScreen> {
                 _step = 1;
                 _nameController.clear();
                 _expiryController.clear();
+                _freshnessNotes = null;
+                _isProduce = false;
               });
             },
             child: const Text('Restart Scan', style: TextStyle(color: Colors.grey, fontSize: 16)),

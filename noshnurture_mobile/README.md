@@ -1,20 +1,16 @@
 # noshnurture_mobile
 
-This is a minimal HeyNosh phone app.
+A new Flutter project.
 
-It does three things:
-- uses the phone microphone for speech-to-text
-- sends the transcript to `https://noshnurture.vercel.app/api/heynosh`
-- shows the assistant reply in an in-app Serial Monitor panel
+## Getting Started
 
-## Run
-1. Open `noshnurture_mobile` in Flutter.
-2. Run `flutter pub get`.
-3. Launch on a phone or emulator with microphone support.
-4. Tap the mic, speak your query, then stop to send it.
+This project is a starting point for a Flutter application.
 
-## Notes
-- The app uses `speech_to_text` for the microphone step.
-- The app sends `Bearer TEST_TOKEN_OR_USER_ID` by default.
-- If you want a real user token later, replace the token in `lib/main.dart`.
-- Android and iOS microphone permissions are already present in the project.
+A few resources to get you started if this is your first Flutter project:
+
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
