@@ -296,11 +296,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           title: 'Telegram',
                           value: _enableTelegram,
                           onChanged: (val) {
+                            if (val && auth.telegramChatId == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please connect the Telegram bot first'),
+                                  backgroundColor: Color(0xFFE2725B),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                              return;
+                            }
                             setState(() => _enableTelegram = val);
                             _saveSettings();
                           },
                         ),
-                        if (_enableTelegram && auth.telegramChatId == null)
+                        if (auth.telegramChatId == null)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             child: ElevatedButton.icon(
@@ -308,13 +318,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               icon: const Icon(Icons.link),
                               label: const Text('Connect Telegram Bot'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue.shade600,
+                                backgroundColor: const Color(0xFFE2725B).withOpacity(0.9),
                                 foregroundColor: Colors.white,
                                 minimumSize: const Size(double.infinity, 45),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                               ),
+                            ),
+                          )
+                        else
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Row(
+                              children: [
+                                Icon(Icons.check_circle, color: Colors.green, size: 16),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Telegram Bot Connected',
+                                  style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
+                                ),
+                              ],
                             ),
                           ),
                         const Divider(indent: 56),
