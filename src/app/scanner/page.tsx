@@ -49,7 +49,7 @@ export default function ScannerPage() {
     if (Number.isNaN(d.getTime())) return String(dateStr);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
-  const [vkImporting, setVkImporting] = useState(false);
+
   const [showOCRScanner, setShowOCRScanner] = useState(false);
   const [showVoiceInput, setShowVoiceInput] = useState(false);
   const [showConversationalInput, setShowConversationalInput] = useState(false);
@@ -71,7 +71,7 @@ export default function ScannerPage() {
     storageType: 'refrigerator',
   });
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
-  const autoFetchDoneRef = useRef(false);
+
 
   // Helper function to parse expiry date properly
   const parseExpiryDate = (dateString: string): string => {
@@ -640,72 +640,9 @@ export default function ScannerPage() {
     }
   };
 
-  // Import Vkart orders into NoshNurture via server API
-  const handleImportVkart = async () => {
-    if (!user) {
-      toast.error('Please sign in to import your Vkart orders.');
-      return;
-    }
 
-    setVkImporting(true);
-    toast.info('Import started — fetching your Vkart orders...');
-    try {
-      const res = await fetch('/api/vkart-sync', { method: 'POST' });
-      const json = await res.json();
 
-      if (!res.ok) {
-        const msg = json?.error || res.statusText || 'Unknown error';
-        toast.error(<>Import failed: <span className="font-semibold">{String(msg)}</span></>);
-      } else {
-        const imported = json.imported ?? 0;
-        const updated = json.updated ?? 0;
-        const count = json.count ?? 0;
 
-        const content = (
-          <div className="flex items-center gap-4">
-            <div className="text-sm">
-              <div>Imported: <strong>{imported}</strong></div>
-              <div>Updated: <strong>{updated}</strong></div>
-              <div>Orders processed: <strong>{count}</strong></div>
-            </div>
-            <div>
-              <button
-                onClick={() => router.push('/inventory')}
-                className="ml-2 bg-emerald-600 text-white px-3 py-1 rounded-md text-sm font-medium hover:bg-emerald-700"
-              >
-                View inventory
-              </button>
-            </div>
-          </div>
-        );
-
-        toast.success(content);
-      }
-    } catch (e) {
-      const err = e as Error;
-      toast.error('Import failed: ' + (err?.message || String(e)));
-    } finally {
-      setVkImporting(false);
-    }
-  };
-
-  // Auto-fetch on mount if the user opted in (only once)
-  useEffect(() => {
-    if (autoFetchDoneRef.current || !user) return;
-
-    try {
-      const settings = getSettings();
-      if (settings.autoFetchVkartOrders) {
-        autoFetchDoneRef.current = true;
-        // Defer slightly so UI can render
-        setTimeout(() => {
-          handleImportVkart();
-        }, 500);
-      }
-    } catch {
-      // ignore
-    }
-  }, [user]);
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] relative overflow-hidden font-['Poppins']">

@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { sendExpiryReminder } from '@/lib/telegram/bot';
+
 import { sendExpiryReminderEmail } from '@/lib/email/resend';
 import { calculateDaysUntilExpiry } from '@/lib/utils/dateUtils';
 
@@ -48,7 +48,6 @@ export async function POST(request: Request) {
         }
 
         let emailSent = false;
-        let telegramSent = false;
         const userName = user.email.split('@')[0];
 
         // Send Email
@@ -61,21 +60,10 @@ export async function POST(request: Request) {
             if (res.success) emailSent = true;
         }
 
-        // Send Telegram
-        if (prefs?.enable_telegram && prefs?.telegram_chat_id) {
-            const res = await sendExpiryReminder(
-                prefs.telegram_chat_id,
-                userName || 'User',
-                expiringItems
-            );
-            if (res.success) telegramSent = true;
-        }
-
         return NextResponse.json({
             stats: {
                 totalItems: expiringItems.length,
-                emailsSent: emailSent ? 1 : 0,
-                telegramSent: telegramSent ? 1 : 0
+                emailsSent: emailSent ? 1 : 0
             }
         });
 

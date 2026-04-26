@@ -172,38 +172,7 @@ export default function FoodDashboard() {
           const newSuggestions = Array.isArray(j.suggestions) ? j.suggestions : [];
           setSuggestions(newSuggestions);
 
-          // Trigger Telegram recipe notification when recipes available
-          if (newSuggestions.length > 0) {
-            // Only send if we haven't sent today (prevent spam)
-            const lastSentKey = 'telegram_recipe_notification_sent';
-            const lastSent = sessionStorage.getItem(lastSentKey);
-            const today = new Date().toDateString();
 
-            if (lastSent !== today) {
-              // Set immediately to prevent race conditions/double sends
-              sessionStorage.setItem(lastSentKey, today);
-
-              fetch('/api/telegram/send-recipes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  recipes: newSuggestions.slice(0, 10),
-                  recipeCount: newSuggestions.length,
-                }),
-              })
-                .then((res) => res.json())
-                .then((result) => {
-                  if (result.success) {
-                    console.log('[Dashboard] Recipe notification sent via Telegram');
-                  }
-                })
-                .catch((err) => {
-                  console.log('[Dashboard] Telegram recipe notification skipped:', err.message);
-                  // Optional: revert if failed, but maybe better to just skip for today to avoid spam loop
-                  // sessionStorage.removeItem(lastSentKey);
-                });
-            }
-          }
         } else {
           const errText = await resp.text();
           console.error('Failed to load suggestions', resp.status, errText);

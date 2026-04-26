@@ -17,7 +17,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _enableEmail = true;
-  bool _enableTelegram = false;
   bool _enablePush = true;
   bool _dailyReminder = true;
   TimeOfDay _notificationTime = const TimeOfDay(hour: 8, minute: 0);
@@ -37,7 +36,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _enableEmail = prefs.getBool('notif_email') ?? true;
-      _enableTelegram = prefs.getBool('notif_telegram') ?? false;
       _enablePush = prefs.getBool('notif_push') ?? true;
       _dailyReminder = prefs.getBool('daily_reminder') ?? true;
       final hour = prefs.getInt('notif_hour') ?? 8;
@@ -50,7 +48,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _isSaving = true);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notif_email', _enableEmail);
-    await prefs.setBool('notif_telegram', _enableTelegram);
     await prefs.setBool('notif_push', _enablePush);
     await prefs.setBool('daily_reminder', _dailyReminder);
     await prefs.setInt('notif_hour', _notificationTime.hour);
@@ -71,7 +68,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await Supabase.instance.client.from('user_preferences').upsert({
           'user_id': auth.userId,
           'enable_email': _enableEmail,
-          'enable_telegram': _enableTelegram,
           'enable_push': _enablePush,
           'reminder_time': '${_notificationTime.hour.toString().padLeft(2, '0')}:${_notificationTime.minute.toString().padLeft(2, '0')}',
         });
@@ -138,33 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _connectTelegram() async {
-    final auth = context.read<AuthProvider>();
-    if (auth.userId == null) return;
-    
-    const botUsername = 'noshnurture_bot'; 
-    
-    // Try direct app link first
-    final appUrl = Uri.parse('tg://resolve?domain=$botUsername&start=${auth.userId}');
-    // Fallback to browser link
-    final webUrl = Uri.parse('https://t.me/$botUsername?start=${auth.userId}');
-    
-    try {
-      if (await canLaunchUrl(appUrl)) {
-        await launchUrl(appUrl, mode: LaunchMode.externalNonBrowserApplication);
-      } else if (await canLaunchUrl(webUrl)) {
-        await launchUrl(webUrl, mode: LaunchMode.externalApplication);
-      } else {
-        throw 'Could not launch any Telegram link';
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e. Make sure Telegram is installed.')),
-        );
-      }
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -290,57 +260,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             _saveSettings();
                           },
                         ),
-                        const Divider(indent: 56),
-                        _buildToggleTile(
-                          icon: Icons.telegram_outlined,
-                          title: 'Telegram',
-                          value: _enableTelegram,
-                          onChanged: (val) {
-                            if (val && auth.telegramChatId == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Please connect the Telegram bot first'),
-                                  backgroundColor: Color(0xFFE2725B),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                              return;
-                            }
-                            setState(() => _enableTelegram = val);
-                            _saveSettings();
-                          },
-                        ),
-                        if (auth.telegramChatId == null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: ElevatedButton.icon(
-                              onPressed: _connectTelegram,
-                              icon: const Icon(Icons.link),
-                              label: const Text('Connect Telegram Bot'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFE2725B).withOpacity(0.9),
-                                foregroundColor: Colors.white,
-                                minimumSize: const Size(double.infinity, 45),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                          )
-                        else
-                          const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                            child: Row(
-                              children: [
-                                Icon(Icons.check_circle, color: Colors.green, size: 16),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Telegram Bot Connected',
-                                  style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600),
-                                ),
-                              ],
-                            ),
-                          ),
+
                         const Divider(indent: 56),
                         _buildToggleTile(
                           icon: Icons.phone_iphone_outlined,

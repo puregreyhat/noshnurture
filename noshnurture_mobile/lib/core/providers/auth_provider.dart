@@ -11,7 +11,7 @@ class AuthProvider extends ChangeNotifier {
   String? _userEmail;
   String? _userId;
   String? _error;
-  String? _telegramChatId;
+
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
@@ -19,7 +19,7 @@ class AuthProvider extends ChangeNotifier {
   String? get userEmail => _userEmail;
   String? get userId => _userId;
   String? get error => _error;
-  String? get telegramChatId => _telegramChatId;
+
 
   final String _authUrl = 'https://baokvmahvfdsexpmasvz.supabase.co/auth/v1';
   final String _anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJhb2t2bWFodmZkc2V4cG1hc3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwNjAyMjksImV4cCI6MjA3NjYzNjIyOX0.1lipYYH9vxGOrCwNRdiCKe3IimuYqbfgj9TdIQVFKHI';
@@ -220,25 +220,9 @@ class AuthProvider extends ChangeNotifier {
     _userEmail = null;
     _userName = null;
     _userId = null;
-    _telegramChatId = null;
+
     notifyListeners();
   }
 
-  Future<void> fetchUserPreferences() async {
-    if (_userId == null) return;
-    try {
-      final response = await Supabase.instance.client
-          .from('user_preferences')
-          .select('telegram_chat_id')
-          .eq('user_id', _userId!)
-          .maybeSingle();
-      
-      if (response != null) {
-        _telegramChatId = response['telegram_chat_id'];
-        notifyListeners();
-      }
-    } catch (e) {
-      debugPrint('Error fetching preferences: $e');
-    }
-  }
+
 }
