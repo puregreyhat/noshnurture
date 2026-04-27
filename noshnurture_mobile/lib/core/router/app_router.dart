@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
-
+import '../../features/survey/screens/survey_screen.dart';
+import '../../features/admin/screens/admin_screen.dart';
 import '../../features/scanner/screens/scanner_screen.dart';
 import '../../main.dart';
 import '../providers/auth_provider.dart';
@@ -47,12 +48,26 @@ class AppRouter {
           builder: (context, state) => const MainLayoutScreen(),
         ),
         GoRoute(
-          path: '/',
-          builder: (context, state) => const MainLayoutScreen(),
+          path: '/survey',
+          builder: (context, state) => const SurveyScreen(),
+        ),
+        GoRoute(
+          path: '/admin',
+          builder: (context, state) => const AdminScreen(),
         ),
         GoRoute(
           path: '/scanner',
           builder: (context, state) => const ScannerScreen(),
+        ),
+        GoRoute(
+          path: '/telegram-callback',
+          builder: (context, state) {
+            // Force refresh preferences when returning from Telegram
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              authProvider.fetchUserPreferences();
+            });
+            return const MainLayoutScreen();
+          },
         ),
       ],
     );

@@ -4,13 +4,14 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/inventory_provider.dart';
-
+import 'core/providers/heynosh_provider.dart';
+import 'core/providers/shopping_list_provider.dart';
 import 'core/providers/recipe_provider.dart';
 import 'core/router/app_router.dart';
 import 'features/dashboard/screens/dashboard_screen.dart';
-
+import 'features/heynosh/screens/heynosh_screen.dart';
 import 'features/inventory/screens/inventory_screen.dart';
-
+import 'features/shopping_list/screens/shopping_list_screen.dart';
 import 'features/settings/screens/settings_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/services/notification_service.dart';
@@ -39,7 +40,8 @@ void main() async {
             return provider;
           },
         ),
-
+        ChangeNotifierProvider(create: (_) => HeyNoshProvider()),
+        ChangeNotifierProvider(create: (_) => ShoppingListProvider()),
         ChangeNotifierProxyProvider<InventoryProvider, RecipeProvider>(
           create: (_) => RecipeProvider(),
           update: (_, inventory, previous) {
@@ -161,20 +163,32 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
   static const List<Widget> _screens = <Widget>[
     DashboardScreen(),
     InventoryScreen(),
+    HeyNoshScreen(),
+    ShoppingListScreen(),
     SettingsScreen(),
   ];
 
-  static const List<String> _labels = <String>['Home', 'Inventory', 'Settings'];
+  static const List<String> _labels = <String>[
+    'Home',
+    'Inventory',
+    'HeyNosh',
+    'Cart',
+    'Settings',
+  ];
 
   static const List<IconData> _outinedIcons = <IconData>[
     Icons.dashboard_outlined,
     Icons.kitchen_outlined,
+    Icons.mic_none_outlined,
+    Icons.shopping_cart_outlined,
     Icons.settings_outlined,
   ];
 
   static const List<IconData> _filledIcons = <IconData>[
     Icons.dashboard_rounded,
     Icons.kitchen_rounded,
+    Icons.mic_rounded,
+    Icons.shopping_cart_rounded,
     Icons.settings_rounded,
   ];
 

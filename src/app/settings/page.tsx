@@ -12,7 +12,11 @@ export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const router = useRouter();
 
-
+  // Auto-fetch settings
+  const [autoFetchEnabled, setAutoFetchEnabled] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
   // Test email
   const [isSendingSample, setIsSendingSample] = useState(false);
@@ -23,10 +27,14 @@ export default function SettingsPage() {
   // Notification preferences
   const [notificationTime, setNotificationTime] = useState('07:00');
   const [enableEmail, setEnableEmail] = useState(true);
+  const [enableTelegram, setEnableTelegram] = useState(false);
   const [enablePush, setEnablePush] = useState(false);
+  const [telegramConnected, setTelegramConnected] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState('');
   const [notifStatus, setNotifStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [notifMessage, setNotifMessage] = useState('');
   const [isSendingTestNotif, setIsSendingTestNotif] = useState(false);
+  const [isSendingTestTelegram, setIsSendingTestTelegram] = useState(false);
   const [isSendingDemoExpiry, setIsSendingDemoExpiry] = useState(false);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -36,7 +44,7 @@ export default function SettingsPage() {
   useEffect(() => {
     try {
       const settings = getSettings();
-
+      setAutoFetchEnabled(settings.autoFetchVkartOrders || false);
 
       // Load preferences immediately
       loadNotificationPreferences();
@@ -46,7 +54,15 @@ export default function SettingsPage() {
         loadNotificationPreferences();
       }, 2000);
 
-
+      // Check if redirected from Telegram success
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('telegram') === 'connected') {
+        setNotifStatus('success');
+        setNotifMessage('✅ Telegram connected successfully!');
+        setTimeout(() => setNotifStatus('idle'), 4000);
+        // Clean URL
+        window.history.replaceState({}, '', '/settings');
+      }
 
       return () => clearTimeout(refreshTimer);
     } catch (e) {
@@ -54,19 +70,38 @@ export default function SettingsPage() {
     }
   }, []);
 
+  // Load notification preferences from database
   const loadNotificationPreferences = async () => {
     try {
       const res = await fetch('/api/user/preferences');
       if (res.ok) {
         const data = await res.json();
+        console.log('[Settings] Preferences loaded:', JSON.stringify({ enableEmail: data.enable_email, enableTelegram: data.enable_telegram, hasChatId: !!data.telegram_chat_id, chatId: data.telegram_chat_id }, null, 2));
         setNotificationTime(data.notification_time || '07:00');
         setEnableEmail(data.enable_email ?? true);
+        setEnableTelegram(data.enable_telegram ?? false);
         setEnablePush(data.enable_push ?? false);
+        setTelegramConnected(!!data.telegram_chat_id);
+        setTelegramChatId(data.telegram_chat_id || '');
       } else {
         console.warn('[Settings] Failed to load preferences:', res.status);
       }
     } catch (err) {
       console.error('Error loading notification preferences:', err);
+    }
+
+    // Cross-check Telegram status via dedicated endpoint (avoids stale cache)
+    try {
+      const tgRes = await fetch('/api/telegram/connect');
+      if (tgRes.ok) {
+        const tg = await tgRes.json();
+        console.log('[Settings] Telegram connect check:', JSON.stringify(tg, null, 2));
+        if (typeof tg.connected === 'boolean') {
+          setTelegramConnected(tg.connected);
+        }
+      }
+    } catch (e) {
+      console.warn('Telegram status check failed (non-blocking):', e);
     }
   };
 
@@ -79,7 +114,55 @@ export default function SettingsPage() {
     }
   };
 
+  // Toggle auto-fetch setting
+  const handleAutoFetchToggle = async (enabled: boolean) => {
+    try {
+      setAutoFetchEnabled(enabled);
+      saveSettings({ autoFetchVkartOrders: enabled });
+      setSyncStatus('success');
+      setSyncMessage(enabled ? '✓ Auto-fetch enabled' : '✓ Auto-fetch disabled');
+      setTimeout(() => setSyncStatus('idle'), 3000);
+    } catch (error) {
+      setSyncStatus('error');
+      setSyncMessage('Failed to save setting');
+      console.error('Error saving settings:', error);
+    }
+  };
 
+  // Manual sync from v-it
+  const handleManualSync = async () => {
+    if (!user) {
+      setSyncStatus('error');
+      setSyncMessage('Please sign in first');
+      return;
+    }
+
+    setIsSyncing(true);
+    setSyncStatus('idle');
+    setSyncMessage('');
+
+    try {
+      const res = await fetch('/api/vkart-sync', { method: 'POST' });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setSyncStatus('error');
+        setSyncMessage(json?.error || 'Sync failed');
+        return;
+      }
+
+      const imported = json.imported ?? 0;
+      const updated = json.updated ?? 0;
+      setSyncStatus('success');
+      setSyncMessage(`✓ Imported ${imported}, Updated ${updated} items`);
+    } catch (error) {
+      setSyncStatus('error');
+      setSyncMessage(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncStatus('idle'), 4000);
+    }
+  };
 
   // Send test email
   const handleSendTestEmail = async () => {
@@ -169,12 +252,15 @@ export default function SettingsPage() {
   };
 
   // Toggle notification channels
-  const handleToggleNotification = async (channel: 'email' | 'push', enabled: boolean) => {
+  const handleToggleNotification = async (channel: 'email' | 'telegram' | 'push', enabled: boolean) => {
     const updates: any = {};
 
     if (channel === 'email') {
       setEnableEmail(enabled);
       updates.enable_email = enabled;
+    } else if (channel === 'telegram') {
+      setEnableTelegram(enabled);
+      updates.enable_telegram = enabled;
     } else if (channel === 'push') {
       setEnablePush(enabled);
       updates.enable_push = enabled;
@@ -191,7 +277,38 @@ export default function SettingsPage() {
     }
   };
 
+  // Connect Telegram
+  const handleConnectTelegram = () => {
+    const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'noshnurture_bot';
+    const userId = user?.id || '';
+    window.open(`https://t.me/${botUsername}?start=${userId}`, '_blank');
+    // Reload preferences after a short delay to reflect connection
+    setTimeout(() => loadNotificationPreferences(), 3000);
+  };
 
+  // Manual refresh connection status
+  const handleRefreshStatus = async () => {
+    setIsRefreshingStatus(true);
+    await loadNotificationPreferences();
+    setTimeout(() => setIsRefreshingStatus(false), 500);
+  };
+
+  // Disconnect Telegram
+  const handleDisconnectTelegram = async () => {
+    try {
+      const res = await fetch('/api/telegram/connect', { method: 'DELETE' });
+      if (res.ok) {
+        setTelegramConnected(false);
+        setEnableTelegram(false);
+        setNotifStatus('success');
+        setNotifMessage('✓ Telegram disconnected');
+        setTimeout(() => setNotifStatus('idle'), 3000);
+      }
+    } catch (err) {
+      setNotifStatus('error');
+      setNotifMessage('Failed to disconnect');
+    }
+  };
 
   // Request push notification permission
   const handleEnablePush = async () => {
@@ -214,7 +331,30 @@ export default function SettingsPage() {
     }
   };
 
+  // Send test Telegram notification
+  const handleSendTestTelegram = async () => {
+    if (!user || !telegramConnected) return;
 
+    setIsSendingTestTelegram(true);
+    try {
+      const res = await fetch('/api/telegram/test', { method: 'POST' });
+      const json = await res.json();
+
+      if (res.ok) {
+        setNotifStatus('success');
+        setNotifMessage('✓ Test sent to Telegram!');
+      } else {
+        setNotifStatus('error');
+        setNotifMessage(json?.error || 'Failed to send');
+      }
+    } catch (error) {
+      setNotifStatus('error');
+      setNotifMessage('Failed to send test');
+    } finally {
+      setIsSendingTestTelegram(false);
+      setTimeout(() => setNotifStatus('idle'), 3000);
+    }
+  };
 
   // Send test browser notification
   const handleTestNotification = async () => {
@@ -323,15 +463,18 @@ export default function SettingsPage() {
       if (res.ok) {
         const stats = json.stats || {};
         const emailsSent = stats.emailsSent ?? 0;
-        console.log('[Settings] Parsed stats:', JSON.stringify({ emailsSent, totalItems }, null, 2));
-        console.log('[Settings] Current UI state:', JSON.stringify({ enableEmail }, null, 2));
+        const telegramSent = stats.telegramSent ?? 0;
+        const totalItems = stats.totalItems ?? 0;
+
+        console.log('[Settings] Parsed stats:', JSON.stringify({ emailsSent, telegramSent, totalItems }, null, 2));
+        console.log('[Settings] Current UI state:', JSON.stringify({ enableEmail, enableTelegram }, null, 2));
 
         if (totalItems === 0) {
           setNotifStatus('error');
           setNotifMessage('No items expiring in the next 7 days');
         } else {
           setNotifStatus('success');
-          setNotifMessage(`✓ Sent ${totalItems} items! Email: ${emailsSent}`);
+          setNotifMessage(`✓ Sent ${totalItems} items! Email: ${emailsSent}, Telegram: ${telegramSent}`);
 
           // Send browser notification if enabled
           const browserNotif = stats.browserNotif ?? false;
@@ -519,7 +662,7 @@ export default function SettingsPage() {
                       <p className="text-sm text-stone-500 font-light">Choose how you want to be notified</p>
                     </div>
                   </div>
-                  {(enableEmail || enablePush) && (
+                  {(enableEmail || enableTelegram || enablePush) && (
                     <motion.button
                       onClick={handleSendRealReminder}
                       disabled={isSendingDemoExpiry}
@@ -552,7 +695,32 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-
+                {/* Telegram Setup Instructions Banner */}
+                {!telegramConnected && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4 }}
+                    className="mb-8 p-6 bg-sky-50 rounded-2xl border border-sky-100"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="text-3xl mt-1">🤖</div>
+                      <div className="flex-1">
+                        <h4 className="font-serif font-bold text-sky-900 mb-3 text-lg">Connect Telegram for Instant Alerts</h4>
+                        <ol className="text-sm text-sky-800 space-y-2 mb-4 font-light">
+                          <li>1. Click <strong>"Connect"</strong> button below</li>
+                          <li>2. Send the bot a message or tap <strong>Start</strong></li>
+                          <li>3. Tap <strong>"Verify & Open Settings"</strong> in the chat</li>
+                          <li>4. Return here to confirm connection</li>
+                        </ol>
+                        <div className="flex items-center gap-2 text-xs bg-white/50 px-3 py-2 rounded-lg text-sky-700 font-medium">
+                          <span>💡</span>
+                          <span>Get instant notifications on your phone via Telegram</span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
 
                 <div className="space-y-4">
                   {/* Email Toggle */}
@@ -584,7 +752,92 @@ export default function SettingsPage() {
                     </motion.button>
                   </motion.div>
 
-
+                  {/* Telegram Toggle */}
+                  <motion.div
+                    whileHover={{ x: 2 }}
+                    className="flex items-center justify-between p-5 bg-white rounded-2xl border border-stone-100 hover:border-sky-100 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-stone-50 flex items-center justify-center text-stone-400">
+                        <span className="text-2xl grayscale opacity-60">✈️</span>
+                      </div>
+                      <div>
+                        <p className="text-base font-bold text-stone-800">Telegram Notifications</p>
+                        <p className="text-sm text-stone-500 font-light">
+                          {telegramConnected ? (
+                            <span className="text-emerald-600 font-medium">✓ Connected</span>
+                          ) : (
+                            <span className="text-stone-400">Not connected</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {telegramConnected && enableTelegram && (
+                        <motion.button
+                          onClick={handleSendTestTelegram}
+                          disabled={isSendingTestTelegram}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          title="Send test notification"
+                          className="w-10 h-10 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-600 disabled:bg-stone-50 disabled:text-stone-300 flex items-center justify-center transition-all border border-sky-100"
+                        >
+                          <span className="text-lg">🧪</span>
+                        </motion.button>
+                      )}
+                      {!telegramConnected && (
+                        <motion.button
+                          onClick={handleRefreshStatus}
+                          disabled={isRefreshingStatus}
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          title="Refresh connection status"
+                          className="w-10 h-10 rounded-xl bg-stone-50 hover:bg-stone-100 text-stone-500 disabled:opacity-50 flex items-center justify-center transition-all border border-stone-100"
+                        >
+                          <motion.span
+                            animate={{ rotate: isRefreshingStatus ? 360 : 0 }}
+                            transition={{ duration: 0.5, repeat: isRefreshingStatus ? Infinity : 0, ease: "linear" }}
+                            className="text-lg"
+                          >
+                            🔄
+                          </motion.span>
+                        </motion.button>
+                      )}
+                      {!telegramConnected ? (
+                        <motion.button
+                          onClick={handleConnectTelegram}
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-5 py-2.5 bg-sky-600 hover:bg-sky-700 text-white rounded-xl text-sm font-bold shadow-md shadow-sky-200 transition-all"
+                        >
+                          Connect
+                        </motion.button>
+                      ) : (
+                        <>
+                          <motion.button
+                            onClick={() => handleToggleNotification('telegram', !enableTelegram)}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className={`w-14 h-8 rounded-full transition-all flex items-center shadow-inner ${enableTelegram ? 'bg-sky-500' : 'bg-stone-200'
+                              }`}
+                          >
+                            <motion.div
+                              animate={{ x: enableTelegram ? '26px' : '2px' }}
+                              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                              className="w-7 h-7 bg-white rounded-full shadow-sm"
+                            />
+                          </motion.button>
+                          <button
+                            onClick={handleDisconnectTelegram}
+                            className="ml-2 p-2 text-stone-400 hover:text-red-500 transition-colors"
+                            title="Disconnect Telegram"
+                          >
+                            <LogOut className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
 
                   {/* Push Notification Toggle */}
                   <motion.div

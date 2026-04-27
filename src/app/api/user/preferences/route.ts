@@ -36,7 +36,9 @@ export async function GET(request: Request) {
             user_id: user.id,
             notification_time: '07:00',
             enable_email: true,
+            enable_telegram: false,
             enable_push: false,
+            telegram_chat_id: null,
           })
           .select()
           .single();
@@ -46,6 +48,8 @@ export async function GET(request: Request) {
           // If insert fails (table doesn't exist), return defaults
           return NextResponse.json({
             notification_time: '07:00',
+            telegram_chat_id: null,
+            enable_telegram: false,
             enable_push: false,
             enable_email: true,
           });
@@ -66,6 +70,8 @@ export async function GET(request: Request) {
     // Return defaults on any error (graceful fallback)
     return NextResponse.json({
       notification_time: '07:00',
+      telegram_chat_id: null,
+      enable_telegram: false,
       enable_push: false,
       enable_email: true,
     });

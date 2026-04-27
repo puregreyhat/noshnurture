@@ -12,6 +12,7 @@ class AuthProvider extends ChangeNotifier {
   String? _userEmail;
   String? _userId;
   String? _error;
+  String? _telegramChatId;
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
@@ -19,6 +20,7 @@ class AuthProvider extends ChangeNotifier {
   String? get userEmail => _userEmail;
   String? get userId => _userId;
   String? get error => _error;
+  String? get telegramChatId => _telegramChatId;
 
   late final String _authUrl;
   late final String _anonKey;
@@ -224,7 +226,25 @@ class AuthProvider extends ChangeNotifier {
     _userEmail = null;
     _userName = null;
     _userId = null;
-
+    _telegramChatId = null;
     notifyListeners();
+  }
+
+  Future<void> fetchUserPreferences() async {
+    if (_userId == null) return;
+    try {
+      final response = await Supabase.instance.client
+          .from('user_preferences')
+          .select('telegram_chat_id')
+          .eq('user_id', _userId!)
+          .maybeSingle();
+      
+      if (response != null) {
+        _telegramChatId = response['telegram_chat_id'];
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error fetching preferences: $e');
+    }
   }
 }

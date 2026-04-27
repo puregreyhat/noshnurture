@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,23 +16,41 @@ class NotificationService {
 
   Future<void> init() async {
     tz_data.initializeTimeZones();
-    
+    await _configureLocalTimezone();
+
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
     const DarwinInitializationSettings initializationSettingsIOS =
         DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
 
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-      iOS: initializationSettingsIOS,
-    );
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+          android: initializationSettingsAndroid,
+          iOS: initializationSettingsIOS,
+        );
 
     await _notificationsPlugin.initialize(initializationSettings);
+
+    final androidPlugin = _notificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+    await androidPlugin?.requestNotificationsPermission();
+    await androidPlugin?.requestExactAlarmsPermission();
+  }
+
+  Future<void> _configureLocalTimezone() async {
+    try {
+      final timezoneName = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(timezoneName));
+    } catch (e) {
+      debugPrint('Failed to set local timezone for notifications: $e');
+    }
   }
 
   Future<void> scheduleDailyExpiryNotification({
@@ -41,7 +60,7 @@ class NotificationService {
     // 1. Filter items expiring in 1-2 days
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
+
     final expiringItems = items.where((item) {
       final expiry = DateTime(
         item.expiryDate.year,
@@ -52,19 +71,21 @@ class NotificationService {
       return daysUntilExpiry >= 0 && daysUntilExpiry <= 2;
     }).toList();
 
+    // 2. Build message (always schedule a daily reminder at selected time)
+    String message;
     if (expiringItems.isEmpty) {
-      // Cancel existing if no items are expiring
-      await _notificationsPlugin.cancel(0);
-      return;
+      message = 'No items are expiring in the next 2 days.';
+    } else {
+      message = "You have ${expiringItems.length} items expiring soon: ";
+      message += expiringItems.take(3).map((e) => e.name).join(", ");
+      if (expiringItems.length > 3) message += " and more.";
     }
-
-    // 2. Build message
-    String message = "You have ${expiringItems.length} items expiring soon: ";
-    message += expiringItems.take(3).map((e) => e.name).join(", ");
-    if (expiringItems.length > 3) message += " and more.";
 
     // 3. Schedule for today or tomorrow at the selected time
     final scheduledDate = _nextInstanceOfTime(time);
+
+    // Replace old schedule with new one.
+    await _notificationsPlugin.cancel(0);
 
     await _notificationsPlugin.zonedSchedule(
       0,
@@ -98,12 +119,23 @@ class NotificationService {
       time.hour,
       time.minute,
     );
-    if (scheduledDate.isBefore(now)) {
+
+    // If picked time is already passed for today, schedule tomorrow.
+    // Keep a small same-minute grace so users selecting "now" still get it.
+    final sameHour = scheduledDate.hour == now.hour;
+    final sameMinute = scheduledDate.minute == now.minute;
+    if (scheduledDate.isBefore(now) && !(sameHour && sameMinute)) {
       scheduledDate = scheduledDate.add(const Duration(days: 1));
+    } else if (sameHour && sameMinute && scheduledDate.isBefore(now)) {
+      scheduledDate = now.add(const Duration(seconds: 5));
     }
     return scheduledDate;
   }
-  
+
+  Future<void> cancelDailyReminder() async {
+    await _notificationsPlugin.cancel(0);
+  }
+
   Future<void> showTestNotification() async {
     await _notificationsPlugin.show(
       999,
@@ -125,9 +157,9 @@ class NotificationService {
     final prefs = await SharedPreferences.getInstance();
     final bool dailyReminder = prefs.getBool('daily_reminder') ?? true;
     final bool enablePush = prefs.getBool('notif_push') ?? true;
-    
+
     if (!dailyReminder || !enablePush) {
-      await _notificationsPlugin.cancel(0);
+      await cancelDailyReminder();
       return;
     }
 

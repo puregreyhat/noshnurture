@@ -26,12 +26,67 @@ class GeminiVisionResult {
 }
 
 class GeminiVisionService {
-  // WE HAVE DITCHED GOOGLE GEMINI. 
+  // WE HAVE DITCHED GOOGLE GEMINI.
   // Using No-Cost, No-Key API from Pollinations.ai
   static const String _baseUrl = 'https://text.pollinations.ai/';
 
+  /// Estimates approximate shelf life in days for packaged products.
+  /// Returns null if AI estimate is unavailable.
+  static Future<int?> estimateShelfLifeDays(String productName) async {
+    if (productName.trim().isEmpty) return null;
+
+    try {
+      final response = await http.post(
+        Uri.parse(_baseUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "messages": [
+            {
+              "role": "system",
+              "content":
+                  "You are a food storage assistant. Estimate unopened shelf life for grocery products and return only JSON.",
+            },
+            {
+              "role": "user",
+              "content":
+                  "Product: $productName\nReturn JSON exactly in this shape: {\"approx_shelf_life_days\": number}. Use only an integer between 1 and 730.",
+            },
+          ],
+          "model": "openai",
+          "jsonMode": true,
+        }),
+      );
+
+      if (response.statusCode != 200) return null;
+
+      final text = response.body;
+      final jsonStart = text.indexOf('{');
+      final jsonEnd = text.lastIndexOf('}');
+      if (jsonStart == -1 || jsonEnd == -1 || jsonEnd <= jsonStart) {
+        return null;
+      }
+
+      final cleanJson = text.substring(jsonStart, jsonEnd + 1);
+      final data = jsonDecode(cleanJson) as Map<String, dynamic>;
+      final value = data['approx_shelf_life_days'];
+      final days = value is num
+          ? value.toInt()
+          : int.tryParse(value?.toString() ?? '');
+      if (days == null) return null;
+
+      // Guardrails against extreme / invalid model output.
+      if (days < 1 || days > 730) return null;
+      return days;
+    } catch (e) {
+      debugPrint('[NoCostAI] Shelf-life estimate failed: $e');
+      return null;
+    }
+  }
+
   /// Identifies product using OCR text (Primary method - Ultra fast)
-  static Future<GeminiVisionResult?> analyzeProductFromText(String rawText) async {
+  static Future<GeminiVisionResult?> analyzeProductFromText(
+    String rawText,
+  ) async {
     if (rawText.trim().isEmpty) return null;
 
     try {
@@ -43,15 +98,17 @@ class GeminiVisionService {
           "messages": [
             {
               "role": "system",
-              "content": "You are a grocery expert. Identify the product brand and name from OCR text. Return ONLY JSON."
+              "content":
+                  "You are a grocery expert. Identify the product brand and name from OCR text. Return ONLY JSON.",
             },
             {
               "role": "user",
-              "content": "Text: $rawText\nReturn JSON format: {\"is_produce\": false, \"product_name\": \"BRAND NAME PRODUCT NAME\", \"expiry_date\": \"DD/MM/YYYY or null\"}"
-            }
+              "content":
+                  "Text: $rawText\nReturn JSON format: {\"is_produce\": false, \"product_name\": \"BRAND NAME PRODUCT NAME\", \"expiry_date\": \"DD/MM/YYYY or null\"}",
+            },
           ],
           "model": "openai",
-          "jsonMode": true
+          "jsonMode": true,
         }),
       );
 
@@ -66,11 +123,13 @@ class GeminiVisionService {
     }
   }
 
-  static Future<GeminiVisionResult?> _fallbackAnalyzeText(String rawText) async {
+  static Future<GeminiVisionResult?> _fallbackAnalyzeText(
+    String rawText,
+  ) async {
     try {
       debugPrint('[NoCostAI] Using Pollinations Text Fallback (OpenAI)...');
       final url = Uri.parse('https://text.pollinations.ai/');
-      
+
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -78,15 +137,17 @@ class GeminiVisionService {
           "messages": [
             {
               "role": "system",
-              "content": "You are a JSON API. Identify product from text. Return ONLY JSON."
+              "content":
+                  "You are a JSON API. Identify product from text. Return ONLY JSON.",
             },
             {
               "role": "user",
-              "content": "Text: $rawText\nReturn JSON: {\"is_produce\": false, \"product_name\": \"Brand Name + Product\", \"expiry_date\": \"...\"}"
-            }
+              "content":
+                  "Text: $rawText\nReturn JSON: {\"is_produce\": false, \"product_name\": \"Brand Name + Product\", \"expiry_date\": \"...\"}",
+            },
           ],
           "model": "openai",
-          "jsonMode": true
+          "jsonMode": true,
         }),
       );
 
@@ -111,12 +172,19 @@ class GeminiVisionService {
             {
               "role": "user",
               "content": [
-                {"type": "text", "text": "Identify this grocery product. Return JSON: {\"product_name\": \"Actual Brand and Product Name\", \"is_produce\": false, \"expiry_date\": \"DD/MM/YYYY or null\"}"},
-                {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64,$base64Image"}}
-              ]
-            }
+                {
+                  "type": "text",
+                  "text":
+                      "Identify this grocery product. Return JSON: {\"product_name\": \"Actual Brand and Product Name\", \"is_produce\": false, \"expiry_date\": \"DD/MM/YYYY or null\"}",
+                },
+                {
+                  "type": "image_url",
+                  "image_url": {"url": "data:image/jpeg;base64,$base64Image"},
+                },
+              ],
+            },
           ],
-          "model": "openai"
+          "model": "openai",
         }),
       );
 
@@ -135,12 +203,12 @@ class GeminiVisionService {
       // Find the first '{' and last '}'
       final jsonStart = text.indexOf('{');
       final jsonEnd = text.lastIndexOf('}');
-      
+
       if (jsonStart != -1 && jsonEnd != -1 && jsonEnd > jsonStart) {
         final cleanJson = text.substring(jsonStart, jsonEnd + 1);
         debugPrint('[NoCostAI] Found JSON block: $cleanJson');
         final data = jsonDecode(cleanJson);
-        
+
         // Ensure we don't return 'Unknown Product' if we can help it
         String name = data['product_name']?.toString() ?? 'Unknown Product';
         if (name == 'null' || name.isEmpty) name = 'Unknown Product';
@@ -160,7 +228,9 @@ class GeminiVisionService {
   }
 
   /// Parses receipt text into a list of items
-  static Future<List<String>> extractGroceryItemsFromText(String rawOcrText) async {
+  static Future<List<String>> extractGroceryItemsFromText(
+    String rawOcrText,
+  ) async {
     if (rawOcrText.trim().isEmpty) return [];
 
     try {
@@ -172,14 +242,16 @@ class GeminiVisionService {
           "messages": [
             {
               "role": "system",
-              "content": "You are a receipt parser. Extract ONLY a list of grocery item names. Return ONLY a JSON array of strings."
+              "content":
+                  "You are a receipt parser. Extract ONLY a list of grocery item names. Return ONLY a JSON array of strings.",
             },
             {
               "role": "user",
-              "content": "Receipt: $rawOcrText\nReturn JSON: [\"Item 1\", \"Item 2\"]"
-            }
+              "content":
+                  "Receipt: $rawOcrText\nReturn JSON: [\"Item 1\", \"Item 2\"]",
+            },
           ],
-          "model": "openai"
+          "model": "openai",
         }),
       );
 

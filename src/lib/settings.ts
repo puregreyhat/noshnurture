@@ -1,7 +1,8 @@
 export type AppSettings = {
   useSemanticNormalization: boolean;
   useLocalAIGenerator: boolean;
-
+  // Whether to auto-fetch Vkart orders on scanner page load
+  autoFetchVkartOrders: boolean;
   // Dietary preferences
   dietaryPreferences: {
     vegetarian: boolean;
@@ -33,7 +34,7 @@ const KEY = "nosh_settings_v1";
 const defaults: AppSettings = {
   useSemanticNormalization: true,
   useLocalAIGenerator: false,
-
+  autoFetchVkartOrders: false,
   dietaryPreferences: {
     vegetarian: false,
     vegan: false,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'camera_ai_screen.dart';
+import 'bill_upload_screen.dart';
+import 'voice_input_screen.dart';
 import 'barcode_scanner_screen.dart';
 import 'manual_entry_screen.dart';
 
@@ -74,6 +76,30 @@ class _ScannerScreenState extends State<ScannerScreen> {
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => const CameraAiScreen(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildScanOption(
+                      icon: Icons.receipt_long,
+                      title: 'Upload Bill',
+                      subtitle: 'Auto-extract multiple items',
+                      color: Colors.blue,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const BillUploadScreen(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildScanOption(
+                      icon: Icons.mic,
+                      title: 'Voice Input',
+                      subtitle: '"I bought 2 liters of milk"',
+                      color: Colors.purple,
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const VoiceInputScreen(),
                         ),
                       ),
                     ),

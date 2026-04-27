@@ -58,7 +58,7 @@ export async function updateSession(request: NextRequest) {
     // Protected routes - redirect to auth if not authenticated
     if (
       !user &&
-      // Do not redirect API routes (e.g., cron jobs, data sync)
+      // Do not redirect API routes (e.g., Telegram webhook, cron jobs)
       !request.nextUrl.pathname.startsWith('/api') &&
       !request.nextUrl.pathname.startsWith('/auth') &&
       !request.nextUrl.pathname.startsWith('/survey') &&
