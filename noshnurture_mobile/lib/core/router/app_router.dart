@@ -4,7 +4,7 @@ import '../../features/auth/screens/login_screen.dart';
 import '../../features/auth/screens/register_screen.dart';
 
 import '../../features/scanner/screens/scanner_screen.dart';
-import '../../main.dart'; // Ensure it can access the wrapper layout in main
+import '../../main.dart';
 import '../providers/auth_provider.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
@@ -54,7 +54,6 @@ class AppRouter {
           path: '/scanner',
           builder: (context, state) => const ScannerScreen(),
         ),
-
       ],
     );
   }

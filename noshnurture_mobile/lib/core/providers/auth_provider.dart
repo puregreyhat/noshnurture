@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class AuthProvider extends ChangeNotifier {
   bool _isAuthenticated = false;
@@ -12,7 +13,6 @@ class AuthProvider extends ChangeNotifier {
   String? _userId;
   String? _error;
 
-
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
   String? get userName => _userName;
@@ -20,11 +20,12 @@ class AuthProvider extends ChangeNotifier {
   String? get userId => _userId;
   String? get error => _error;
 
-
-  final String _authUrl = 'https://baokvmahvfdsexpmasvz.supabase.co/auth/v1';
-  final String _anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJhb2t2bWFodmZkc2V4cG1hc3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwNjAyMjksImV4cCI6MjA3NjYzNjIyOX0.1lipYYH9vxGOrCwNRdiCKe3IimuYqbfgj9TdIQVFKHI';
+  late final String _authUrl;
+  late final String _anonKey;
 
   AuthProvider() {
+    _authUrl = '${dotenv.env['SUPABASE_URL']}/auth/v1';
+    _anonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
     _checkInitialAuth();
     _setupSupabaseAuthListener();
   }
@@ -37,7 +38,11 @@ class AuthProvider extends ChangeNotifier {
       if (event == AuthChangeEvent.signedIn && session != null) {
         final user = session.user;
         final userId = user.id;
-        final userName = user.userMetadata?['name'] ?? user.userMetadata?['full_name'] ?? user.email?.split('@')[0] ?? 'User';
+        final userName =
+            user.userMetadata?['name'] ??
+            user.userMetadata?['full_name'] ??
+            user.email?.split('@')[0] ??
+            'User';
         final email = user.email ?? '';
 
         final prefs = await SharedPreferences.getInstance();
@@ -50,7 +55,7 @@ class AuthProvider extends ChangeNotifier {
         _userEmail = email;
         _userName = userName;
         _userId = userId;
-        
+
         _isLoading = false;
         notifyListeners();
       }
@@ -60,8 +65,9 @@ class AuthProvider extends ChangeNotifier {
   Future<void> _checkInitialAuth() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token');
-    
-    if (token == 'mock_jwt_token_12345' || token == 'temp_token_waiting_verification') {
+
+    if (token == 'mock_jwt_token_12345' ||
+        token == 'temp_token_waiting_verification') {
       await logout();
       return;
     }
@@ -83,14 +89,8 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await http.post(
         Uri.parse('$_authUrl/token?grant_type=password'),
-        headers: {
-          'apikey': _anonKey,
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'email': email,
-          'password': password,
-        }),
+        headers: {'apikey': _anonKey, 'Content-Type': 'application/json'},
+        body: json.encode({'email': email, 'password': password}),
       );
 
       if (response.statusCode == 200) {
@@ -110,13 +110,16 @@ class AuthProvider extends ChangeNotifier {
         _userEmail = email;
         _userName = userName;
         _userId = userId;
-        
+
         _isLoading = false;
         notifyListeners();
         return true;
       } else {
         final errorData = json.decode(response.body);
-        _error = errorData['error_description'] ?? errorData['msg'] ?? 'Login failed';
+        _error =
+            errorData['error_description'] ??
+            errorData['msg'] ??
+            'Login failed';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -137,32 +140,30 @@ class AuthProvider extends ChangeNotifier {
     try {
       final response = await http.post(
         Uri.parse('$_authUrl/signup'),
-        headers: {
-          'apikey': _anonKey,
-          'Content-Type': 'application/json',
-        },
+        headers: {'apikey': _anonKey, 'Content-Type': 'application/json'},
         body: json.encode({
           'email': email,
           'password': password,
-          'data': {
-            'name': name,
-          }
+          'data': {'name': name},
         }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
-        final token = data['access_token'] ?? ''; 
+        final token = data['access_token'] ?? '';
         final user = data['user'] ?? data;
         final userId = user['id'];
 
         final prefs = await SharedPreferences.getInstance();
         if (token.isNotEmpty) {
-           await prefs.setString('auth_token', token);
-           _isAuthenticated = true;
+          await prefs.setString('auth_token', token);
+          _isAuthenticated = true;
         } else {
-           await prefs.setString('auth_token', 'temp_token_waiting_verification');
-           _isAuthenticated = true;
+          await prefs.setString(
+            'auth_token',
+            'temp_token_waiting_verification',
+          );
+          _isAuthenticated = true;
         }
         await prefs.setString('user_email', email);
         await prefs.setString('user_name', name);
@@ -171,13 +172,16 @@ class AuthProvider extends ChangeNotifier {
         _userEmail = email;
         _userName = name;
         _userId = userId;
-        
+
         _isLoading = false;
         notifyListeners();
         return true;
       } else {
         final errorData = json.decode(response.body);
-        _error = errorData['error_description'] ?? errorData['msg'] ?? 'Registration failed';
+        _error =
+            errorData['error_description'] ??
+            errorData['msg'] ??
+            'Registration failed';
         _isLoading = false;
         notifyListeners();
         return false;
@@ -215,7 +219,7 @@ class AuthProvider extends ChangeNotifier {
     await prefs.remove('user_email');
     await prefs.remove('user_name');
     await prefs.remove('user_id');
-    
+
     _isAuthenticated = false;
     _userEmail = null;
     _userName = null;
@@ -223,6 +227,4 @@ class AuthProvider extends ChangeNotifier {
 
     notifyListeners();
   }
-
-
 }

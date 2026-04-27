@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/inventory_provider.dart';
 
@@ -17,10 +18,12 @@ import 'core/services/notification_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Supabase.initialize(
-    url: 'https://baokvmahvfdsexpmasvz.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJhb2t2bWFodmZkc2V4cG1hc3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjEwNjAyMjksImV4cCI6MjA3NjYzNjIyOX0.1lipYYH9vxGOrCwNRdiCKe3IimuYqbfgj9TdIQVFKHI',
-  );
+  await dotenv.load(fileName: "lib/.env");
+
+  final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+  final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
 
   await NotificationService().init();
 
@@ -107,11 +110,15 @@ class _NoshNurtureAppState extends State<NoshNurtureApp> {
           fillColor: Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: const Color(0xFFE2725B).withOpacity(0.2)),
+            borderSide: BorderSide(
+              color: const Color(0xFFE2725B).withOpacity(0.2),
+            ),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
-            borderSide: BorderSide(color: const Color(0xFFE2725B).withOpacity(0.2)),
+            borderSide: BorderSide(
+              color: const Color(0xFFE2725B).withOpacity(0.2),
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(16),
@@ -157,11 +164,7 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
     SettingsScreen(),
   ];
 
-  static const List<String> _labels = <String>[
-    'Home',
-    'Inventory',
-    'Settings',
-  ];
+  static const List<String> _labels = <String>['Home', 'Inventory', 'Settings'];
 
   static const List<IconData> _outinedIcons = <IconData>[
     Icons.dashboard_outlined,
@@ -195,7 +198,10 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
           _labels.length,
           (index) => NavigationDestination(
             icon: Icon(_outinedIcons[index], color: const Color(0xFF64748B)),
-            selectedIcon: Icon(_filledIcons[index], color: const Color(0xFF166534)),
+            selectedIcon: Icon(
+              _filledIcons[index],
+              color: const Color(0xFF166534),
+            ),
             label: _labels[index],
           ),
         ),
